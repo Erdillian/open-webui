@@ -129,6 +129,24 @@ async def build_system_prompt(
             k=k_passive * 3,  # Retrieve more for better filtering
         )
         top_memories = memories[:k_passive]
+
+        # Trace retrieval
+        try:
+            from open_webui.memory_layer.services.audit_service import trace_event
+            await trace_event(
+                user_id=user_id,
+                event_type="retrieval_query",
+                payload={
+                    "query": user_message,
+                    "k_requested": k_passive * 3,
+                    "k_returned": len(memories),
+                    "k_injected": len(top_memories),
+                    "injected_memory_previews": [m.get("content", "")[:80] for m in top_memories],
+                },
+                summary=f"Retrieval: query='{user_message[:60]}...' -> {len(top_memories)} memories injected",
+            )
+        except Exception:
+            pass
     except Exception as e:
         log.warning(f"Memory retrieval failed: {e}")
         top_memories = []

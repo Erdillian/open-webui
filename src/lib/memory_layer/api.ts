@@ -85,6 +85,15 @@ export async function getHealth(token: string) {
     return fetchJSON(`${API_BASE}/health`, token);
 }
 
+export async function getAuditLogs(token: string, params?: { event_type?: string; chat_id?: string; limit?: number; offset?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.event_type) qs.set('event_type', params.event_type);
+    if (params?.chat_id) qs.set('chat_id', params.chat_id);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    return fetchJSON(`${API_BASE}/audit/?${qs.toString()}`, token);
+}
+
 export async function submitOnboarding(token: string, answers: { question: string; answer: string; category: string }[]) {
     return fetchJSON(`${API_BASE}/memory/onboarding`, token, {
         method: 'POST',

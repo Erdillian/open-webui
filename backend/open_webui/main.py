@@ -108,7 +108,7 @@ from open_webui.routers import (
     calendar,
 )
 
-from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router, export as export_router
+from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router, export as export_router, audit as audit_router
 from open_webui.memory_layer.functions.memory_filter import Filter as MemoryFilter
 
 # Auto-enable memory layer filter without requiring manual admin configuration
@@ -1493,6 +1493,7 @@ app.include_router(profile_router.router, prefix='/api/mem/profile', tags=['memo
 app.include_router(conflicts_router.router, prefix='/api/mem/conflicts', tags=['memory_layer'])
 app.include_router(opening_router.router, prefix='/api/mem/opening_prompt', tags=['memory_layer'])
 app.include_router(export_router.router, prefix='/api/mem', tags=['memory_layer'])
+app.include_router(audit_router.router, prefix='/api/mem/audit', tags=['memory_layer'])
 
 # SCIM 2.0 API for identity management
 if ENABLE_SCIM:

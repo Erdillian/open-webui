@@ -100,6 +100,23 @@ async def _do_full_regen(user_id: str) -> None:
         full_profile_json=full_profile,
     )
     await reset_memories_since_regen(user_id)
+
+    # Trace regen
+    try:
+        from open_webui.memory_layer.services.audit_service import trace_event
+        await trace_event(
+            user_id=user_id,
+            event_type="profile_regen",
+            payload={
+                "memories_count": len(memories),
+                "executive_summary_preview": executive_summary[:200],
+                "profile_sections": list(full_profile.keys()),
+            },
+            summary=f"Full profile regenerated from {len(memories)} memories",
+        )
+    except Exception:
+        pass
+
     log.info(f"Full profile regen completed for user {user_id}")
 
 

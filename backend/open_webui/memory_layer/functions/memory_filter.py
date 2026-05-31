@@ -89,7 +89,24 @@ class Filter:
 
             body["messages"] = messages
 
-            # Log injected memories count for debugging
+            # Trace context injection
+            try:
+                from open_webui.memory_layer.services.audit_service import trace_event
+                await trace_event(
+                    user_id=user_id,
+                    event_type="inlet_injected",
+                    payload={
+                        "system_prompt_length": len(system_prompt),
+                        "k_passive": self.valves.k_passive,
+                        "anti_sycophancy": self.valves.anti_sycophancy_enabled,
+                        "user_message_preview": user_message[:200],
+                    },
+                    summary=f"Injected system prompt ({len(system_prompt)} chars) for user message: {user_message[:80]}...",
+                    chat_id=body.get("chat_id"),
+                )
+            except Exception:
+                pass
+
             log.debug(f"memory_filter inlet: injected context for user {user_id}")
 
         except Exception as e:
@@ -148,6 +165,22 @@ class Filter:
                         messages=last_exchange,
                         chat_id=chat_id,
                     )
+                    # Trace outlet enqueue
+                    try:
+                        from open_webui.memory_layer.services.audit_service import trace_event
+                        await trace_event(
+                            user_id=user_id,
+                            event_type="outlet_enqueued",
+                            payload={
+                                "exchange_messages_count": len(last_exchange),
+                                "last_user_message": last_exchange[0].get("content", "")[:200] if last_exchange else "",
+                                "last_assistant_message": last_exchange[-1].get("content", "")[:200] if last_exchange else "",
+                            },
+                            summary=f"Enqueued exchange for extraction: {last_exchange[0].get('content', '')[:60]}... -> {last_exchange[-1].get('content', '')[:60]}...",
+                            chat_id=chat_id,
+                        )
+                    except Exception:
+                        pass
                     log.info(f"memory_filter outlet: enqueued exchange for user {user_id}")
                 except Exception as queue_e:
                     # extraction_queue may not exist yet during early phases

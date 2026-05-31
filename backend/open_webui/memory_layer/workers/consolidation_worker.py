@@ -179,6 +179,23 @@ async def _consolidate_cluster(user_id: str, cluster: list[MemoryItem]) -> Optio
                 db.add(m)
                 await db.commit()
 
+        # Trace consolidation
+        try:
+            from open_webui.memory_layer.services.audit_service import trace_event
+            await trace_event(
+                user_id=user_id,
+                event_type="consolidation_created",
+                payload={
+                    "cluster_size": len(cluster),
+                    "consolidated_content_preview": consolidated.content[:200],
+                    "source_memory_ids": [m.id for m in cluster],
+                },
+                summary=f"Consolidated {len(cluster)} memories into synthesis #{consolidated.id}",
+                memory_id=consolidated.id,
+            )
+        except Exception:
+            pass
+
         log.info(f"Created consolidation memory {consolidated.id} from {len(cluster)} sources")
         return consolidated
 

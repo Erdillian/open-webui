@@ -268,19 +268,60 @@ async def extract_memories_from_exchange(
 
                 created_ids.append(memory_item.id)
 
+                # Trace memory creation
+                try:
+                    from open_webui.memory_layer.services.audit_service import trace_event
+                    await trace_event(
+                        user_id=user_id,
+                        event_type="extraction_created",
+                        payload={
+                            "content": content,
+                            "category": category,
+                            "importance": importance,
+                            "sensitivity": sensitivity,
+                            "speaker": speaker,
+                            "conflicts_count": len(conflicts),
+                        },
+                        summary=f"Extracted memory [{category}]: {content[:100]}...",
+                        chat_id=chat_id,
+                        memory_id=memory_item.id,
+                    )
+                except Exception:
+                    pass
+
                 # Create conflict entries if any
                 for conflict in conflicts:
                     from open_webui.memory_layer.models.conflict import MemoryConflict
 
                     conflict_entry = MemoryConflict(
                         user_id=user_id,
-                        memory_a_id=memory_item.id,  # This is tricky: we need the existing memory's DB id
+                        memory_a_id=memory_item.id,
                         memory_b_id=memory_item.id,
                         similarity_score=conflict["similarity"],
                         status="pending",
                         detected_at=now,
                     )
                     db.add(conflict_entry)
+
+                    # Trace conflict
+                    try:
+                        from open_webui.memory_layer.services.audit_service import trace_event
+                        await trace_event(
+                            user_id=user_id,
+                            event_type="conflict_detected",
+                            payload={
+                                "new_memory_id": memory_item.id,
+                                "existing_chroma_id": conflict.get("chroma_id"),
+                                "existing_content_preview": conflict.get("content", "")[:100],
+                                "similarity": conflict["similarity"],
+                            },
+                            summary=f"Conflict detected: new memory similar ({conflict['similarity']:.2f}) to existing",
+                            chat_id=chat_id,
+                            memory_id=memory_item.id,
+                        )
+                    except Exception:
+                        pass
+
                 await db.commit()
 
             except Exception as e:

@@ -132,6 +132,23 @@ async def update_memory(
 
         await db.commit()
         await db.refresh(item)
+
+        # Trace update
+        try:
+            from open_webui.memory_layer.services.audit_service import trace_event
+            await trace_event(
+                user_id=user.id,
+                event_type="memory_updated",
+                payload={
+                    "changes": data.model_dump(exclude_unset=True),
+                    "content_preview": item.content[:100],
+                },
+                summary=f"Memory #{memory_id} updated",
+                memory_id=memory_id,
+            )
+        except Exception:
+            pass
+
         return MemoryItemResponse.model_validate(item)
 
 
@@ -150,6 +167,8 @@ async def delete_memory(
         if not item or item.user_id != user.id:
             raise HTTPException(status_code=404, detail="Memory not found")
 
+        content_preview = item.content[:100]
+
         # Delete from ChromaDB
         if item.chroma_id:
             try:
@@ -159,6 +178,20 @@ async def delete_memory(
 
         await db.delete(item)
         await db.commit()
+
+        # Trace delete
+        try:
+            from open_webui.memory_layer.services.audit_service import trace_event
+            await trace_event(
+                user_id=user.id,
+                event_type="memory_deleted",
+                payload={"content_preview": content_preview},
+                summary=f"Memory #{memory_id} deleted: {content_preview}...",
+                memory_id=memory_id,
+            )
+        except Exception:
+            pass
+
         return {"ok": True}
 
 
@@ -246,5 +279,21 @@ async def onboarding_create_memories(
     import asyncio
     from open_webui.memory_layer.workers.profile_worker import _do_full_regen
     asyncio.create_task(_do_full_regen(user.id))
+
+    # Trace onboarding
+    try:
+        from open_webui.memory_layer.services.audit_service import trace_event
+        await trace_event(
+            user_id=user.id,
+            event_type="onboarding_completed",
+            payload={
+                "answers_count": len(payload.answers),
+                "categories": list({a.category for a in payload.answers}),
+                "created_memory_ids": created_ids,
+            },
+            summary=f"Onboarding completed: {len(payload.answers)} answers saved as memories",
+        )
+    except Exception:
+        pass
 
     return {"ok": True, "created": len(created_ids), "memory_ids": created_ids}
