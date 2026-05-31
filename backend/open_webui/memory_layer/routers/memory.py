@@ -243,4 +243,8 @@ async def onboarding_create_memories(
             db.add(profile)
         await db.commit()
 
+    import asyncio
+    from open_webui.memory_layer.workers.profile_worker import _do_full_regen
+    asyncio.create_task(_do_full_regen(user.id))
+
     return {"ok": True, "created": len(created_ids), "memory_ids": created_ids}

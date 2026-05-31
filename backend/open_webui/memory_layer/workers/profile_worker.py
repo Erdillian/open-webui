@@ -242,8 +242,23 @@ async def profile_worker_loop() -> None:
 
     while _running:
         try:
-            # In a real implementation, we'd have a queue or schedule
-            # For now, just sleep and check periodically
+            # Scan users with memories and check if profile needs update
+            from open_webui.internal.db import get_async_db
+            from sqlalchemy import select, distinct
+
+            async with get_async_db() as db:
+                stmt = select(distinct(MemoryItem.user_id))
+                result = await db.execute(stmt)
+                user_ids = [row[0] for row in result.fetchall()]
+
+            for user_id in user_ids:
+                if not _running:
+                    break
+                try:
+                    await check_and_run_profile_updates(user_id)
+                except Exception as user_e:
+                    log.warning(f"Profile update check failed for user {user_id}: {user_e}")
+
             await asyncio.sleep(60)  # Check every minute
         except asyncio.CancelledError:
             log.info("Profile worker cancelled.")
