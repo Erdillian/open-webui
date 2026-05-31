@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Memory page
+    import MemoryList from '$lib/memory_layer/components/MemoryList.svelte';
 </script>
 
-<h1>Memory</h1>
+<MemoryList />

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Profile page
+    import ProfileEditor from '$lib/memory_layer/components/ProfileEditor.svelte';
 </script>
 
-<h1>Profile</h1>
+<ProfileEditor />

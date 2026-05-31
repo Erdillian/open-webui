@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Conflicts page
+    import ConflictsList from '$lib/memory_layer/components/ConflictsList.svelte';
 </script>
 
-<h1>Conflicts</h1>
+<ConflictsList />
