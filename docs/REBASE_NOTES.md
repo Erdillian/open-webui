@@ -9,6 +9,10 @@ This document tracks which native Open WebUI files were touched by the memory la
   - Added `app.include_router(health.router, prefix="/api/mem", tags=["memory_layer"])` to wire the memory layer API endpoints into the FastAPI application.
   - This is the minimal required touch-point to expose memory layer routes.
 
+- `backend/open_webui/migrations/env.py`
+  - Imported memory layer models (`MemoryItem`, `MemoryConflict`, `UserProfile`, `UserProfileHistory`, `MemoryTag`, `MemoryItemTag`) so Alembic autogenerate includes our tables in `target_metadata`.
+  - Required for `alembic upgrade head` to create the `mem_*` tables.
+
 ## Unmodified Native Files
 
 All other new functionality lives under:

@@ -4,6 +4,10 @@ from logging.config import fileConfig
 from alembic import context
 from open_webui.models.auths import Auth
 from open_webui.models.calendar import Calendar, CalendarEvent, CalendarEventAttendee  # noqa: F401
+from open_webui.memory_layer.models.memory import MemoryItem  # noqa: F401
+from open_webui.memory_layer.models.conflict import MemoryConflict  # noqa: F401
+from open_webui.memory_layer.models.profile import UserProfile, UserProfileHistory  # noqa: F401
+from open_webui.memory_layer.models.tag import MemoryTag, MemoryItemTag  # noqa: F401
 from open_webui.env import DATABASE_URL, DATABASE_PASSWORD, LOG_FORMAT
 from open_webui.internal.db import extract_ssl_params_from_url, reattach_ssl_params_to_url
 from sqlalchemy import engine_from_config, pool, create_engine
