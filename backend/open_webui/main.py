@@ -108,7 +108,7 @@ from open_webui.routers import (
     calendar,
 )
 
-from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router
+from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router
 
 from open_webui.routers.retrieval import (
     get_embedding_function,
@@ -703,6 +703,14 @@ async def lifespan(app: FastAPI):
         log.info('Memory layer profile worker started.')
     except Exception as e:
         log.warning(f'Failed to start memory profile worker: {e}')
+
+    # Start memory layer consolidation worker
+    try:
+        from open_webui.memory_layer.workers.consolidation_worker import consolidation_worker_loop
+        asyncio.create_task(consolidation_worker_loop())
+        log.info('Memory layer consolidation worker started.')
+    except Exception as e:
+        log.warning(f'Failed to start memory consolidation worker: {e}')
 
     if app.state.config.ENABLE_BASE_MODELS_CACHE:
         try:
@@ -1478,6 +1486,8 @@ app.include_router(calendar.router, prefix='/api/v1/calendars', tags=['calendars
 app.include_router(health.router, prefix='/api/mem', tags=['memory_layer'])
 app.include_router(memory_router.router, prefix='/api/mem/memory', tags=['memory_layer'])
 app.include_router(profile_router.router, prefix='/api/mem/profile', tags=['memory_layer'])
+app.include_router(conflicts_router.router, prefix='/api/mem/conflicts', tags=['memory_layer'])
+app.include_router(opening_router.router, prefix='/api/mem/opening_prompt', tags=['memory_layer'])
 
 # SCIM 2.0 API for identity management
 if ENABLE_SCIM:
