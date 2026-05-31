@@ -108,7 +108,7 @@ from open_webui.routers import (
     calendar,
 )
 
-from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router
+from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router, export as export_router
 
 from open_webui.routers.retrieval import (
     get_embedding_function,
@@ -1488,6 +1488,7 @@ app.include_router(memory_router.router, prefix='/api/mem/memory', tags=['memory
 app.include_router(profile_router.router, prefix='/api/mem/profile', tags=['memory_layer'])
 app.include_router(conflicts_router.router, prefix='/api/mem/conflicts', tags=['memory_layer'])
 app.include_router(opening_router.router, prefix='/api/mem/opening_prompt', tags=['memory_layer'])
+app.include_router(export_router.router, prefix='/api/mem/export', tags=['memory_layer'])
 
 # SCIM 2.0 API for identity management
 if ENABLE_SCIM:
