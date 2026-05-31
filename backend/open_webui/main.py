@@ -2039,7 +2039,24 @@ async def chat_completion(
 
             ctx = await build_chat_response_context(request, form_data, user, model, metadata, tasks, events)
 
-            return await process_chat_response(response, ctx)
+            result = await process_chat_response(response, ctx)
+
+            # Memory layer outlet hook — enqueue exchange for extraction
+            async def _run_outlet():
+                try:
+                    if _memory_filter.valves.enabled:
+                        user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                        await _memory_filter.outlet(form_data, user_dict)
+                except Exception as e:
+                    log.error(f'memory_filter outlet hook error: {e}')
+
+            try:
+                asyncio.create_task(_run_outlet())
+                log.debug('memory_filter outlet task created')
+            except Exception as e:
+                log.error(f'memory_filter outlet task creation error: {e}')
+
+            return result
         except asyncio.CancelledError:
             log.info('Chat processing was cancelled')
             try:

@@ -10,10 +10,10 @@ class MemoryLayerConfig:
     MEM_EMBEDDINGS_MODEL: str = os.getenv("MEM_EMBEDDINGS_MODEL", "nomic-embed-text")
 
     # Extractor
-    MEM_EXTRACTOR_MODEL: str = os.getenv("MEM_EXTRACTOR_MODEL", "qwen3:32b-cloud")
+    MEM_EXTRACTOR_MODEL: str = os.getenv("MEM_EXTRACTOR_MODEL", "qwen3-coder-next:cloud")
 
     # Profile
-    MEM_PROFILE_MODEL: str = os.getenv("MEM_PROFILE_MODEL", "qwen3:32b-cloud")
+    MEM_PROFILE_MODEL: str = os.getenv("MEM_PROFILE_MODEL", "qwen3-coder-next:cloud")
 
     # Retrieval
     MEM_DEFAULT_K_PASSIVE: int = int(os.getenv("MEM_DEFAULT_K_PASSIVE", "8"))

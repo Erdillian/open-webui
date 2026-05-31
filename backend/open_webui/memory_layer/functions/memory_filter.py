@@ -100,15 +100,41 @@ class Filter:
 
     async def outlet(self, body: dict, __user__: dict) -> dict:
         """Capture exchange AFTER LLM response for memory extraction."""
+        log.info("memory_filter outlet called")
         if not self.valves.enabled:
+            log.info("memory_filter outlet: disabled")
             return body
 
         try:
             user_id = __user__.get("id", "")
             if not user_id:
+                log.info("memory_filter outlet: no user_id")
                 return body
 
             messages = body.get("messages", [])
+            chat_id = body.get("chat_id")
+            log.info(f"memory_filter outlet: user={user_id}, chat_id={chat_id}, messages_count={len(messages)}")
+
+            # If assistant response is not yet in body (streaming), fetch from DB
+            if not messages or messages[-1].get("role") != "assistant":
+                if chat_id:
+                    try:
+                        from open_webui.models.chats import Chats
+
+                        chat = await Chats.get_chat_by_id(chat_id)
+                        if chat and chat.chat:
+                            history = chat.chat.get("history", {}).get("messages", {})
+                            if history:
+                                sorted_msgs = sorted(
+                                    history.items(),
+                                    key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0]
+                                )
+                                msgs = [v for k, v in sorted_msgs]
+                                if msgs and msgs[-1].get("role") == "assistant":
+                                    messages = msgs
+                    except Exception:
+                        pass
+
             if len(messages) >= 2:
                 # Capture last user + assistant exchange
                 last_exchange = messages[-2:]
@@ -117,16 +143,17 @@ class Filter:
                 try:
                     from open_webui.memory_layer.workers.extraction_queue import enqueue
 
-                    chat_id = body.get("chat_id")
                     await enqueue(
                         user_id=user_id,
                         messages=last_exchange,
                         chat_id=chat_id,
                     )
-                    log.debug(f"memory_filter outlet: enqueued exchange for user {user_id}")
+                    log.info(f"memory_filter outlet: enqueued exchange for user {user_id}")
                 except Exception as queue_e:
                     # extraction_queue may not exist yet during early phases
-                    log.debug(f"memory_filter outlet: could not enqueue: {queue_e}")
+                    log.info(f"memory_filter outlet: could not enqueue: {queue_e}")
+            else:
+                log.info(f"memory_filter outlet: not enough messages ({len(messages)})")
 
         except Exception as e:
             log.error(f"memory_filter outlet error: {e}")
