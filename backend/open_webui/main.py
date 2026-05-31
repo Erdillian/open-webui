@@ -108,7 +108,7 @@ from open_webui.routers import (
     calendar,
 )
 
-from open_webui.memory_layer.routers import health
+from open_webui.memory_layer.routers import health, memory as memory_router
 
 from open_webui.routers.retrieval import (
     get_embedding_function,
@@ -687,6 +687,14 @@ async def lifespan(app: FastAPI):
     from open_webui.utils.automations import scheduler_worker_loop
 
     asyncio.create_task(scheduler_worker_loop(app))
+
+    # Start memory layer extraction worker
+    try:
+        from open_webui.memory_layer.workers.extraction_worker import extraction_worker_loop
+        asyncio.create_task(extraction_worker_loop())
+        log.info('Memory layer extraction worker started.')
+    except Exception as e:
+        log.warning(f'Failed to start memory extraction worker: {e}')
 
     if app.state.config.ENABLE_BASE_MODELS_CACHE:
         try:
@@ -1460,6 +1468,7 @@ app.include_router(automations.router, prefix='/api/v1/automations', tags=['auto
 app.include_router(calendar.router, prefix='/api/v1/calendars', tags=['calendars'])
 
 app.include_router(health.router, prefix='/api/mem', tags=['memory_layer'])
+app.include_router(memory_router.router, prefix='/api/mem/memory', tags=['memory_layer'])
 
 # SCIM 2.0 API for identity management
 if ENABLE_SCIM:
