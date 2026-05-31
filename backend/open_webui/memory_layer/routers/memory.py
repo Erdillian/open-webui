@@ -9,6 +9,7 @@ from open_webui.memory_layer.schemas.memory_schemas import (
     MemoryItemCreate,
     MemoryItemResponse,
     MemoryItemUpdate,
+    OnboardingPayload,
 )
 from open_webui.utils.auth import get_verified_user
 from open_webui.models.users import UserModel
@@ -70,7 +71,7 @@ async def create_memory(
             pinned=data.pinned,
             archived=data.archived,
             related_to=data.related_to,
-            metadata=data.metadata,
+            meta=data.meta,
         )
         db.add(item)
         await db.commit()
@@ -126,8 +127,8 @@ async def update_memory(
             item.archived = data.archived
         if data.related_to is not None:
             item.related_to = data.related_to
-        if data.metadata is not None:
-            item.metadata = data.metadata
+        if data.meta is not None:
+            item.meta = data.meta
 
         await db.commit()
         await db.refresh(item)
@@ -170,3 +171,76 @@ async def re_extract(
     """Re-run extraction on an existing chat."""
     # TODO: Implement re-extraction from chat history
     return {"ok": True, "message": "Re-extraction queued"}
+
+
+@router.post("/onboarding")
+async def onboarding_create_memories(
+    request: Request,
+    payload: OnboardingPayload,
+    user: UserModel = Depends(get_verified_user),
+):
+    """Create initial memories from onboarding questionnaire answers."""
+    import time
+    import uuid as uuid_module
+
+    from open_webui.internal.db import get_async_db
+    from open_webui.memory_layer.embeddings.ollama_embed import embed_text
+    from open_webui.memory_layer.retrieval.chroma_client import add_memory
+    from open_webui.memory_layer.models.profile import UserProfile
+
+    created_ids = []
+    now = int(time.time())
+
+    async with get_async_db() as db:
+        for ans in payload.answers:
+            item = MemoryItem(
+                user_id=user.id,
+                content=ans.answer,
+                timestamp_created=now,
+                category=ans.category or "fact",
+                importance=0.8,
+                sensitivity=0.0,
+                speaker="user",
+                meta={"source": "onboarding", "question": ans.question},
+            )
+            db.add(item)
+            await db.commit()
+            await db.refresh(item)
+            created_ids.append(item.id)
+
+            try:
+                embedding = await embed_text(ans.answer)
+                chroma_id = str(uuid_module.uuid4())
+                chroma_meta = {
+                    "user_id": user.id,
+                    "category": item.category,
+                    "importance": item.importance,
+                    "sensitivity": item.sensitivity,
+                    "timestamp_event": now,
+                    "memory_item_id": item.id,
+                    "pinned": False,
+                    "archived": False,
+                }
+                add_memory(embedding, ans.answer, chroma_meta, chroma_id)
+                item.chroma_id = chroma_id
+                await db.commit()
+            except Exception as e:
+                log.warning(f"Failed to embed onboarding memory: {e}")
+
+        # Mark onboarding as done
+        profile = await db.get(UserProfile, user.id)
+        if profile:
+            profile.onboarding_done = True
+            profile.last_updated = now
+        else:
+            profile = UserProfile(
+                user_id=user.id,
+                executive_summary="",
+                full_profile_json={},
+                last_updated=now,
+                onboarding_done=True,
+            )
+            db.add(profile)
+        await db.commit()
+
+    return {"ok": True, "created": len(created_ids), "memory_ids": created_ids}

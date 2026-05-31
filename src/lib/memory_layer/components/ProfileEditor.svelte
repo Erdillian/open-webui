@@ -14,10 +14,10 @@
         loading = true;
         error = '';
         try {
-            profile = await getProfile();
+            profile = await getProfile(localStorage.token);
             execSummary = profile.executive_summary || '';
             fullJson = JSON.stringify(profile.full_profile_json || {}, null, 2);
-            history = await getProfileHistory();
+            history = await getProfileHistory(localStorage.token);
         } catch (e: any) {
             error = e.message;
         } finally {
@@ -35,7 +35,7 @@
                 alert('JSON invalide');
                 return;
             }
-            await updateProfile({ executive_summary: execSummary, full_profile_json: parsed });
+            await updateProfile(localStorage.token, { executive_summary: execSummary, full_profile_json: parsed });
             await load();
         } catch (e: any) {
             error = e.message;
@@ -46,7 +46,7 @@
 
     async function regen() {
         if (!confirm('Régénérer le profil complet ? Cela peut prendre un moment.')) return;
-        await regenerateProfile();
+        await regenerateProfile(localStorage.token);
         alert('Régénération lancée en arrière-plan.');
     }
 

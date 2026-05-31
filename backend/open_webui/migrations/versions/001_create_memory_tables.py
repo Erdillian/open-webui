@@ -15,7 +15,7 @@ from open_webui.migrations.util import get_existing_tables
 
 # revision identifiers, used by Alembic.
 revision: str = "mem_001"
-down_revision: Union[str, None] = None
+down_revision: Union[str, None] = "a0b1c2d3e4f5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -44,7 +44,7 @@ def upgrade() -> None:
             sa.Column("superseded_by", sa.Integer(), nullable=True),
             sa.Column("related_to", sa.JSON(), nullable=True),
             sa.Column("chroma_id", sa.String(), nullable=True),
-            sa.Column("metadata", sa.JSON(), nullable=True),
+            sa.Column("meta", sa.JSON(), nullable=True),
             sa.PrimaryKeyConstraint("id"),
             sa.Index("idx_mem_items_user_id", "user_id"),
             sa.Index("idx_mem_items_chat_id", "source_chat_id"),
@@ -63,7 +63,7 @@ def upgrade() -> None:
             sa.Column("similarity_score", sa.Float(), nullable=True),
             sa.Column("status", sa.String(), nullable=True),
             sa.Column("resolution_memory_id", sa.Integer(), nullable=True),
-            sa.Column("metadata", sa.JSON(), nullable=True),
+            sa.Column("meta", sa.JSON(), nullable=True),
             sa.PrimaryKeyConstraint("id"),
             sa.Index("idx_mem_conflicts_user_id", "user_id"),
             sa.Index("idx_mem_conflicts_status", "status"),

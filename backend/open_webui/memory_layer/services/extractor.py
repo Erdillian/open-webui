@@ -85,7 +85,7 @@ async def _detect_duplicates(
 ) -> Optional[dict]:
     """Check if a semantically identical memory already exists.
 
-    Returns the existing memory metadata if duplicate found, else None.
+    Returns the existing memory meta if duplicate found, else None.
     """
     results = query_memories(
         embedding=new_embedding,
@@ -101,9 +101,9 @@ async def _detect_duplicates(
         distance = distances[i] if i < len(distances) else 1.0
         similarity = 1.0 - distance
         if similarity >= threshold:
-            metadatas = results.get("metadatas", [[]])[0]
-            meta = metadatas[i] if i < len(metadatas) else {}
-            return {"chroma_id": chroma_id, "metadata": meta, "similarity": similarity}
+            metas = results.get("metas", [[]])[0]
+            meta = metas[i] if i < len(metas) else {}
+            return {"chroma_id": chroma_id, "meta": meta, "similarity": similarity}
     return None
 
 
@@ -126,7 +126,7 @@ async def _detect_conflicts(
     ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
     documents = results.get("documents", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
+    metas = results.get("metas", [[]])[0]
 
     conflicts = []
     for i, chroma_id in enumerate(ids):
@@ -135,12 +135,12 @@ async def _detect_conflicts(
         distance = distances[i] if i < len(distances) else 1.0
         similarity = 1.0 - distance
         if low_threshold <= similarity < high_threshold:
-            meta = metadatas[i] if i < len(metadatas) else {}
+            meta = metas[i] if i < len(metas) else {}
             conflicts.append(
                 {
                     "chroma_id": chroma_id,
                     "content": documents[i] if i < len(documents) else "",
-                    "metadata": meta,
+                    "meta": meta,
                     "similarity": similarity,
                 }
             )

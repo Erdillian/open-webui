@@ -1,7 +1,7 @@
 """Pydantic schemas for memory items."""
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MemoryItemCreate(BaseModel):
@@ -18,7 +18,7 @@ class MemoryItemCreate(BaseModel):
     pinned: bool = False
     archived: bool = False
     related_to: Optional[list] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 
 
 class MemoryItemUpdate(BaseModel):
@@ -28,10 +28,12 @@ class MemoryItemUpdate(BaseModel):
     pinned: Optional[bool] = None
     archived: Optional[bool] = None
     related_to: Optional[list] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 
 
 class MemoryItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: str
     content: str
@@ -50,4 +52,15 @@ class MemoryItemResponse(BaseModel):
     superseded_by: Optional[int] = None
     related_to: Optional[list] = None
     chroma_id: Optional[str] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
+
+
+class OnboardingAnswer(BaseModel):
+    question: str
+    answer: str
+    category: str = "fact"
+
+
+class OnboardingPayload(BaseModel):
+    answers: list[OnboardingAnswer]
+    skip_questionnaire: bool = False

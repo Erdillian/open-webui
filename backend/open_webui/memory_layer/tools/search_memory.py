@@ -57,7 +57,7 @@ class Tools:
 
             lines = ["Souvenirs trouvés :"]
             for i, r in enumerate(results, 1):
-                meta = r.get("metadata", {})
+                meta = r.get("meta", {})
                 cat = meta.get("category", "?")
                 importance = meta.get("importance", "?")
                 content = r.get("content", "")

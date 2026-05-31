@@ -109,6 +109,10 @@ from open_webui.routers import (
 )
 
 from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router, export as export_router
+from open_webui.memory_layer.functions.memory_filter import Filter as MemoryFilter
+
+# Auto-enable memory layer filter without requiring manual admin configuration
+_memory_filter = MemoryFilter()
 
 from open_webui.routers.retrieval import (
     get_embedding_function,
@@ -2008,6 +2012,14 @@ async def chat_completion(
         try:
             form_data, metadata, events = await process_chat_payload(request, form_data, user, metadata, model)
 
+            # Memory layer inlet hook — inject profile + memories context
+            try:
+                if _memory_filter.valves.enabled:
+                    user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                    form_data = await _memory_filter.inlet(form_data, user_dict)
+            except Exception as e:
+                log.error(f'memory_filter inlet hook error: {e}')
+
             response = await chat_completion_handler(request, form_data, user)
 
             # When the upstream provider returns an error (e.g. HTTP 400
@@ -2269,7 +2281,17 @@ async def chat_completed(request: Request, form_data: dict, user=Depends(get_ver
             request.state.direct = True
             request.state.model = model_item
 
-        return await chat_completed_handler(request, form_data, user)
+        result = await chat_completed_handler(request, form_data, user)
+
+        # Memory layer outlet hook — enqueue exchange for extraction
+        try:
+            if _memory_filter.valves.enabled:
+                user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                await _memory_filter.outlet(form_data, user_dict)
+        except Exception as e:
+            log.error(f'memory_filter outlet hook error: {e}')
+
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

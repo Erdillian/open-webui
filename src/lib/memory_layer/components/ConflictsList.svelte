@@ -10,7 +10,7 @@
         loading = true;
         error = '';
         try {
-            conflicts = await listConflicts();
+            conflicts = await listConflicts(localStorage.token);
         } catch (e: any) {
             error = e.message;
         } finally {
@@ -19,12 +19,12 @@
     }
 
     async function ignore(id: number) {
-        await updateConflict(id, { status: 'ignored' });
+        await updateConflict(localStorage.token, id, { status: 'ignored' });
         await load();
     }
 
     async function resolve(id: number) {
-        await updateConflict(id, { status: 'resolved' });
+        await updateConflict(localStorage.token, id, { status: 'resolved' });
         await load();
     }
 

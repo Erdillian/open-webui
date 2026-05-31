@@ -29,6 +29,9 @@ async def get_user_profile(
 ):
     """Get the current user's profile."""
     profile = await get_or_create_profile(user.id)
+    # Coerce None onboarding_done → False for legacy rows
+    if getattr(profile, "onboarding_done", None) is None:
+        profile.onboarding_done = False
     return UserProfileResponse.model_validate(profile)
 
 
@@ -47,6 +50,8 @@ async def patch_user_profile(
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Profile not found")
+    if getattr(updated, "onboarding_done", None) is None:
+        updated.onboarding_done = False
     return UserProfileResponse.model_validate(updated)
 
 

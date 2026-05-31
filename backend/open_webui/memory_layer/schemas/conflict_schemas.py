@@ -1,16 +1,18 @@
 """Pydantic schemas for memory conflicts."""
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MemoryConflictUpdate(BaseModel):
     status: Optional[str] = None
     resolution_memory_id: Optional[int] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 
 
 class MemoryConflictResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: str
     memory_a_id: int
@@ -19,4 +21,4 @@ class MemoryConflictResponse(BaseModel):
     similarity_score: Optional[float] = None
     status: str = "pending"
     resolution_memory_id: Optional[int] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None

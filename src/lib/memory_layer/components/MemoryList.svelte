@@ -10,7 +10,7 @@
         loading = true;
         error = '';
         try {
-            memories = await listMemories();
+            memories = await listMemories(localStorage.token);
         } catch (e: any) {
             error = e.message;
         } finally {
@@ -19,18 +19,18 @@
     }
 
     async function togglePin(mem: any) {
-        await updateMemory(mem.id, { pinned: !mem.pinned });
+        await updateMemory(localStorage.token, mem.id, { pinned: !mem.pinned });
         await load();
     }
 
     async function toggleArchive(mem: any) {
-        await updateMemory(mem.id, { archived: !mem.archived });
+        await updateMemory(localStorage.token, mem.id, { archived: !mem.archived });
         await load();
     }
 
     async function remove(mem: any) {
         if (!confirm('Supprimer ce souvenir ?')) return;
-        await deleteMemory(mem.id);
+        await deleteMemory(localStorage.token, mem.id);
         await load();
     }
 

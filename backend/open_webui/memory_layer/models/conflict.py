@@ -32,7 +32,7 @@ class MemoryConflict(Base):
     resolution_memory_id = Column(
         Integer, ForeignKey("mem_items.id", ondelete="SET NULL"), nullable=True
     )
-    metadata = Column(JSON, nullable=True)
+    meta = Column(JSON, nullable=True)
 
 
 class MemoryConflictModel(BaseModel):
@@ -44,6 +44,6 @@ class MemoryConflictModel(BaseModel):
     similarity_score: Optional[float] = None
     status: str = "pending"
     resolution_memory_id: Optional[int] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)

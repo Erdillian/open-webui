@@ -26,9 +26,7 @@ class MemoryItem(Base):
     source_chat_id = Column(
         String, ForeignKey("chat.id", ondelete="SET NULL"), nullable=True
     )
-    source_document_id = Column(
-        String, ForeignKey("document.id", ondelete="SET NULL"), nullable=True
-    )
+    source_document_id = Column(String, nullable=True)
     workspace_id = Column(String, nullable=True)
     timestamp_created = Column(BigInteger, nullable=True)
     timestamp_event = Column(BigInteger, nullable=True)
@@ -43,7 +41,7 @@ class MemoryItem(Base):
     )
     related_to = Column(JSON, nullable=True)
     chroma_id = Column(String, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    meta = Column(JSON, nullable=True)
 
 
 class MemoryItemModel(BaseModel):
@@ -65,6 +63,6 @@ class MemoryItemModel(BaseModel):
     superseded_by: Optional[int] = None
     related_to: Optional[list] = None
     chroma_id: Optional[str] = None
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)

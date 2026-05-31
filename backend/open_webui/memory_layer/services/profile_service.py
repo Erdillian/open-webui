@@ -31,6 +31,7 @@ async def get_or_create_profile(user_id: str) -> UserProfile:
         full_profile_json={},
         last_updated=now,
         memories_since_regen=0,
+        onboarding_done=False,
     )
     async with get_async_db() as db:
         db.add(profile)

@@ -82,7 +82,7 @@ async def _cluster_memories(user_id: str) -> list[list[MemoryItem]]:
             embedding = await embed_text(mem.content)
             results = query_memories(
                 embedding=embedding,
-                filter_dict={"user_id": user_id, "archived": False},
+                filter_dict={"$and": [{"user_id": user_id}, {"archived": False}]},
                 k=20,
             )
             ids = results.get("ids", [[]])[0]

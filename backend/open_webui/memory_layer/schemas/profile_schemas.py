@@ -1,7 +1,7 @@
 """Pydantic schemas for user profile."""
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UserProfileUpdate(BaseModel):
@@ -10,15 +10,20 @@ class UserProfileUpdate(BaseModel):
 
 
 class UserProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: str
     executive_summary: str
     full_profile_json: dict
     last_updated: Optional[int] = None
     last_full_regen: Optional[int] = None
     memories_since_regen: int = 0
+    onboarding_done: Optional[bool] = False
 
 
 class UserProfileHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: str
     executive_summary: str

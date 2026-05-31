@@ -48,14 +48,15 @@
 	import UpdateInfoToast from '$lib/components/layout/UpdateInfoToast.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { Shortcut, shortcuts } from '$lib/shortcuts';
+	import OnboardingModal from '$lib/memory_layer/components/OnboardingModal.svelte';
 
 	const i18n = getContext('i18n');
 
 	let loaded = false;
 	let DB = null;
 	let localDBChats = [];
-
 	let version;
+	let showOnboarding = false;
 
 	const clearChatInputStorage = () => {
 		const chatInputKeys = Object.keys(localStorage).filter((key) => key.startsWith('chat-input'));
@@ -213,6 +214,17 @@
 				]);
 			}).catch((e) => console.error('Failed to load user settings:', e))
 		]);
+
+		// Check if onboarding questionnaire should be shown
+		try {
+			const { getProfile } = await import('$lib/memory_layer/api');
+			const profile = await getProfile(localStorage.token);
+			if (profile && !profile.onboarding_done && !localStorage.onboardingDismissed) {
+				showOnboarding = true;
+			}
+		} catch (e) {
+			console.error('Failed to check onboarding status:', e);
+		}
 
 		// Helper function to check if the pressed keys match the shortcut definition
 		const isShortcutMatch = (event: KeyboardEvent, shortcut): boolean => {
@@ -390,6 +402,12 @@
 		/>
 	</div>
 {/if}
+
+<OnboardingModal
+	show={showOnboarding}
+	on:done={() => { showOnboarding = false; localStorage.removeItem('onboardingDismissed'); }}
+	on:skip={() => { showOnboarding = false; localStorage.setItem('onboardingDismissed', 'true'); }}
+/>
 
 {#if $user}
 	<div class="app relative">

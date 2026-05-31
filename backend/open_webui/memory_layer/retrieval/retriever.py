@@ -96,19 +96,26 @@ async def search_memories(
     # Embed the query
     query_embedding = await embed_text(query)
 
-    # Build ChromaDB filter
-    filter_dict: dict = {"user_id": user_id}
+    # Build ChromaDB filter (must use operator syntax; flat dict with multiple keys rejected)
+    conditions: list[dict] = [{"user_id": user_id}]
     if category and category != "any":
-        filter_dict["category"] = category
+        conditions.append({"category": category})
     if workspace_id:
-        filter_dict["workspace_id"] = workspace_id
+        conditions.append({"workspace_id": workspace_id})
     if not include_archived:
-        filter_dict["archived"] = False
+        conditions.append({"archived": False})
+
+    if len(conditions) > 1:
+        filter_dict = {"$and": conditions}
+    elif conditions:
+        filter_dict = conditions[0]
+    else:
+        filter_dict = None
 
     # Query ChromaDB
     raw_result = query_memories(
         embedding=query_embedding,
-        filter_dict=filter_dict if len(filter_dict) > 1 else None,
+        filter_dict=filter_dict,
         k=k,
     )
 

@@ -71,7 +71,7 @@ async def export_memory(
                 "pinned": m.pinned,
                 "archived": m.archived,
                 "related_to": m.related_to,
-                "metadata": m.metadata,
+                "meta": m.meta,
             }
             for m in result.scalars().all()
         ]
@@ -167,7 +167,7 @@ async def import_memory(
                     pinned=item.get("pinned", False),
                     archived=item.get("archived", False),
                     related_to=item.get("related_to"),
-                    metadata=item.get("metadata"),
+                    meta=item.get("meta"),
                 )
                 db.add(mem)
                 await db.commit()

@@ -3,7 +3,7 @@ from typing import Optional
 
 from open_webui.internal.db import Base
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, Integer, JSON, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, Integer, JSON, String, Text
 
 
 class UserProfile(Base):
@@ -15,6 +15,7 @@ class UserProfile(Base):
     last_updated = Column(BigInteger, nullable=True)
     last_full_regen = Column(BigInteger, nullable=True)
     memories_since_regen = Column(Integer, default=0)
+    onboarding_done = Column(Boolean, default=False)
 
 
 class UserProfileHistory(Base):
@@ -35,6 +36,7 @@ class UserProfileModel(BaseModel):
     last_updated: Optional[int] = None
     last_full_regen: Optional[int] = None
     memories_since_regen: int = 0
+    onboarding_done: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
