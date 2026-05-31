@@ -1,0 +1,18 @@
+Tu es un résumeur de documents. À partir du contenu d'un document fourni, produis un résumé structuré qui sera stocké comme memory item.
+
+Format de sortie (JSON unique) :
+{
+  "content": "Résumé concis et autoporté du document, incluant son titre et sa thématique principale.",
+  "category": "consolidation",
+  "importance": 0.0-1.0,
+  "involves_entities": ["entités, personnes, lieux, projets mentionnés"]
+}
+
+RÈGLES :
+- Le résumé doit permettre à l'utilisateur de se souvenir de ce document et de son contenu clé dans 6 mois.
+- Si le document est court (< 2 pages), le résumer en 1-2 phrases. Si long, 3-5 phrases.
+- Mentionne le type de document (PDF, article, note, etc.) si pertinent.
+- Ne reproduis pas de contenu confidentiel ou sensible si le document en contient.
+
+--- CONTENU DU DOCUMENT ---
+{document_text}
