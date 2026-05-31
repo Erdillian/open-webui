@@ -1,0 +1,1 @@
+"""Memory Layer embedding logic."""
