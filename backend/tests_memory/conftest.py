@@ -65,6 +65,15 @@ async def db_session(_shared_test_db_path):
     )
     async with AsyncSessionLocal() as db:
         yield db
+        # Cleanup memory_layer tables after each test to keep isolation
+        from sqlalchemy import delete
+        from open_webui.memory_layer.models.memory import MemoryItem
+        from open_webui.memory_layer.models.conflict import MemoryConflict
+        from open_webui.memory_layer.models.profile import UserProfile, UserProfileHistory
+        from open_webui.memory_layer.models.tag import MemoryTag, MemoryItemTag
+        for model in (MemoryItemTag, MemoryConflict, MemoryItem, MemoryTag, UserProfileHistory, UserProfile):
+            await db.execute(delete(model))
+        await db.commit()
     await engine.dispose()
 
 
@@ -137,3 +146,4 @@ def patch_env():
         os.environ.pop("OLLAMA_BASE_URL", None)
     else:
         os.environ["OLLAMA_BASE_URL"] = old
+

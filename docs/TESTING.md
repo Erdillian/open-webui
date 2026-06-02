@@ -8,15 +8,19 @@ This document describes the automated test suite for the `memory_layer` custom e
 
 ```
 backend/tests_memory/
-├── conftest.py               # Common fixtures (DB in-memory, mock embeddings)
+├── conftest.py               # Common fixtures (DB file-based, mock embeddings)
 ├── fixtures/
 │   ├── user_facts.json         # Real facts extracted from OpenAI export
 │   └── test_scenarios.json     # Chronological conversation scenarios
 ├── test_models.py              # Quick sanity check for ORM models (pre-existing)
+├── TEST_LOG.md                 # Execution log and applied fixes
 ├── unit/
 │   ├── test_retrieval.py       # Scoring, re-ranking, decay formulas
 │   ├── test_context_builder.py # Date markers, prompt assembly
-│   └── test_conflict_detection.py # Duplicate & conflict detection
+│   ├── test_conflict_detection.py # Duplicate & conflict detection
+│   ├── test_router_memory.py   # Memory CRUD router
+│   ├── test_router_profile.py  # Profile router
+│   └── test_router_conflicts.py # Conflict router
 ├── integration/
 │   ├── test_extraction.py      # Extraction with mocked LLM
 │   └── test_profile_worker.py  # Profile incremental update
@@ -38,7 +42,7 @@ pytest tests_memory/unit tests_memory/integration -v --tb=short
 # E2E mocked scenarios
 pytest tests_memory/e2e/test_e2e_scenarios.py -v
 
-# Full suite (43 tests)
+# Full suite (68 tests)
 pytest tests_memory -v --tb=short
 
 # Coverage
@@ -49,10 +53,10 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 ## Latest Run Summary
 
 - **Date**: 2026-06-02
-- **Result**: 43 passed, 0 failed
-- **Duration**: ~1.9s
+- **Result**: 68 passed, 0 failed
+- **Duration**: ~2.7s
 - **Python**: 3.12.10
-- **Plugins**: anyio-4.13.0
+- **Plugins**: anyio-4.13.0, randomly-4.1.0
 
 ### Breakdown
 
@@ -61,6 +65,9 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 | Unit | `test_retrieval.py` | 9 | ✅ Pass |
 | Unit | `test_context_builder.py` | 12 | ✅ Pass |
 | Unit | `test_conflict_detection.py` | 5 | ✅ Pass |
+| Unit | `test_router_memory.py` | 12 | ✅ Pass |
+| Unit | `test_router_profile.py` | 7 | ✅ Pass |
+| Unit | `test_router_conflicts.py` | 6 | ✅ Pass |
 | Integration | `test_extraction.py` | 2 | ✅ Pass |
 | Integration | `test_profile_worker.py` | 1 | ✅ Pass |
 | E2E | `test_e2e_scenarios.py` | 8 | ✅ Pass |
@@ -72,6 +79,9 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 2. **`NoReferencedTableError`**: Imported `Chat` and `User` native models in `conftest.py` so their tables are registered in `Base.metadata`.
 3. **ChromaDB dimension mismatch**: Monkeypatched `add_memory` at the module import site (`open_webui.memory_layer.services.extractor`) rather than the original definition.
 4. **Temporal assertions**: E2E assertions verify the presence of `<system_context>` blocks instead of exact delta strings, because the real current date (2026) differs from scenario dates (2024).
+5. **Profile schema mismatch**: Added `memories_since_regen=0` to `UserProfile` test objects to satisfy Pydantic validation.
+6. **DB isolation**: Cleanup moved into `db_session` fixture teardown to prevent data leakage between router tests.
+7. **Async fixture warnings**: Removed standalone `clean_memory_tables` async autouse fixture; cleanup now happens inside `db_session` teardown, avoiding `PytestRemovedIn9Warning` on sync tests.
 
 ## Fixtures
 
