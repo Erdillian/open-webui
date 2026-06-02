@@ -2,6 +2,7 @@
 import asyncio
 import time
 
+import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -12,13 +13,18 @@ from open_webui.memory_layer.models.profile import UserProfile, UserProfileHisto
 from open_webui.memory_layer.models.tag import MemoryTag, MemoryItemTag
 
 
+@pytest.mark.anyio
 async def test_models():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     AsyncSessionLocal = sessionmaker(
-        bind=engine, class_=AsyncSession, autocommit=False, autoflush=False
+        bind=engine,
+        class_=AsyncSession,
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
     )
 
     async with AsyncSessionLocal() as db:

@@ -309,3 +309,8 @@ dist
 cypress/videos
 cypress/screenshots
 .vscode/settings.json
+
+# Memory layer fixtures containing personal data
+backend/tests_memory/fixtures/user_facts.json
+backend/tests_memory/fixtures/test_scenarios.json
+
