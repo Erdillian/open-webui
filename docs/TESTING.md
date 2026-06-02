@@ -108,6 +108,29 @@ For the E2E scenarios, the `extractor` is mocked but the `context_builder` and `
 
 Test output is captured in `logs/test_run.log`.
 
+## Functional Smoke Test
+
+A standalone script (`tests_memory/functional_smoke_test.py`) imports the full FastAPI app and verifies the memory_layer is operational:
+
+```bash
+.venv\Scripts\python.exe tests_memory\functional_smoke_test.py
+```
+
+**Latest result:** 8/8 checks passed
+
+| Check | Result |
+|---|---|
+| Import main FastAPI app | ✅ PASS |
+| memory_filter accessible | ✅ PASS |
+| ChromaDB collection exists | ✅ PASS |
+| GET /api/mem/health | ✅ PASS |
+| GET /api/mem/memory/ | ✅ PASS |
+| POST /api/mem/memory/ | ✅ PASS |
+| GET /api/mem/profile/ | ✅ PASS |
+| GET /api/mem/conflicts/ | ✅ PASS |
+
+> **Verdict: memory_layer is FUNCTIONALLY OPERATIONAL.**
+
 ## Next Steps / Extension Ideas
 
 - Add `@pytest.mark.slow` tests that run against a real Ollama instance for end-to-end validation.

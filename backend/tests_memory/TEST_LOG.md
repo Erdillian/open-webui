@@ -40,6 +40,32 @@
 | `routers/conflicts.py` | **~30%** | List + patch |
 | Routers/workers/consolidation (rest) | **0%** | Still dark |
 
+## Session 2026-06-02 — Phase 3 (Functional smoke test)
+- **Script**: `tests_memory/functional_smoke_test.py`
+- **Method**: Import full FastAPI app, mock auth/LLM/ChromaDB, hit endpoints via `httpx.AsyncClient`
+- **Result**: 8/8 checks passed
+
+### Functional Checks
+| Check | Result | Detail |
+|---|---|---|
+| Import main FastAPI app | ✅ PASS | App loads, migrations run |
+| memory_filter accessible | ✅ PASS | `Filter` instance present in `main.py` |
+| ChromaDB collection exists | ✅ PASS | Collection `memory_items` initialized |
+| GET /api/mem/health | ✅ PASS | Returns `{"ok": true}` |
+| GET /api/mem/memory/ | ✅ PASS | Empty list `[]` |
+| POST /api/mem/memory/ | ✅ PASS | Created memory id=1 |
+| GET /api/mem/profile/ | ✅ PASS | Default profile created for user |
+| GET /api/mem/conflicts/ | ✅ PASS | Empty list `[]` |
+
+### Observations
+- **Migrations**: All Alembic migrations run successfully including memory_layer (`mem_001`, `mem_002`, `mem_003`).
+- **Sentence-Transformers**: Loads `all-MiniLM-L6-v2` from local cache (warning about `position_ids` is benign).
+- **Windows encoding**: `PYTHONIOENCODING=utf-8` required to avoid `UnicodeEncodeError` on the ASCII art banner in `main.py`.
+- **DB isolation**: Script uses temporary SQLite file; cleanup ignores `PermissionError` on Windows locked handles.
+
+## Verdict
+**memory_layer is FUNCTIONALLY OPERATIONAL.**
+
 ## Next Actions
 - Add `@pytest.mark.slow` tests with real Ollama for end-to-end validation.
 - Cover `memory_filter.inlet/outlet` (primary Open WebUI integration point).
