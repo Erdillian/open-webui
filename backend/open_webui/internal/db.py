@@ -117,6 +117,20 @@ extract_ssl_mode_from_url = extract_ssl_params_from_url
 reattach_ssl_mode_to_url = reattach_ssl_params_to_url
 
 
+def escape_sqlcipher_pragma_key(key: str) -> str:
+    """Escape a SQLCipher PRAGMA key safely for string literal syntax.
+
+    Validates the key and escapes embedded single quotes by doubling them.
+    This avoids SQL/PRAGMA injection via the database password.
+    """
+    if not isinstance(key, str):
+        raise TypeError("SQLCipher PRAGMA key must be a string")
+    # Reject control characters that could alter statement parsing.
+    if "\x00" in key or "\n" in key or "\r" in key:
+        raise ValueError("SQLCipher PRAGMA key contains invalid control characters")
+    return key.replace("'", "''")
+
+
 class JSONField(types.TypeDecorator):
     impl = types.Text
     cache_ok = True
@@ -226,8 +240,9 @@ if SQLALCHEMY_DATABASE_URL.startswith('sqlite+sqlcipher://'):
     def create_sqlcipher_connection():
         import sqlcipher3
 
+        safe_key = escape_sqlcipher_pragma_key(database_password)
         conn = sqlcipher3.connect(db_path, check_same_thread=False)
-        conn.execute(f"PRAGMA key = '{database_password}'")
+        conn.execute(f"PRAGMA key = '{safe_key}'")
         return conn
 
     # The dummy "sqlite://" URL would cause SQLAlchemy to auto-select
