@@ -107,13 +107,18 @@ async def update_memory(
     data: MemoryItemUpdate,
     user: UserModel = Depends(get_verified_user),
 ):
-    """Edit a memory item."""
+    """Edit a memory item and keep the ChromaDB copy in sync."""
     from open_webui.internal.db import get_async_db
+    from open_webui.memory_layer.retrieval.chroma_client import update_memory as update_chroma_memory
+    from open_webui.memory_layer.embeddings.ollama_embed import embed_text
 
     async with get_async_db() as db:
         item = await db.get(MemoryItem, memory_id)
         if not item or item.user_id != user.id:
             raise HTTPException(status_code=404, detail="Memory not found")
+
+        changed = data.model_dump(exclude_unset=True)
+        content_changed = data.content is not None
 
         if data.content is not None:
             item.content = data.content
@@ -133,6 +138,37 @@ async def update_memory(
         await db.commit()
         await db.refresh(item)
 
+        # Synchronize ChromaDB copy if content or indexed metadata changed
+        if item.chroma_id and (content_changed or any(k in changed for k in (
+            "importance", "sensitivity", "pinned", "archived", "category", "timestamp_event"
+        ))):
+            try:
+                chroma_meta = {
+                    "user_id": user.id,
+                    "category": item.category,
+                    "importance": item.importance,
+                    "sensitivity": item.sensitivity,
+                    "timestamp_event": item.timestamp_event if item.timestamp_event else "",
+                    "memory_item_id": item.id,
+                    "pinned": item.pinned,
+                    "archived": item.archived,
+                }
+                if content_changed:
+                    embedding = await embed_text(item.content)
+                    update_chroma_memory(
+                        chroma_id=item.chroma_id,
+                        content=item.content,
+                        metadata=chroma_meta,
+                        embedding=embedding,
+                    )
+                else:
+                    update_chroma_memory(
+                        chroma_id=item.chroma_id,
+                        metadata=chroma_meta,
+                    )
+            except Exception as e:
+                log.warning(f"Failed to update memory in ChromaDB: {e}")
+
         # Trace update
         try:
             from open_webui.memory_layer.services.audit_service import trace_event
@@ -140,7 +176,7 @@ async def update_memory(
                 user_id=user.id,
                 event_type="memory_updated",
                 payload={
-                    "changes": data.model_dump(exclude_unset=True),
+                    "changes": changed,
                     "content_preview": item.content[:100],
                 },
                 summary=f"Memory #{memory_id} updated",
