@@ -57,7 +57,7 @@ def _build_memories_block(memories: list[dict]) -> str:
         return ""
     lines = ["<relevant_memories>"]
     for mem in memories:
-        meta = mem.get("meta", {})
+        meta = mem.get("metadata", {})
         importance = meta.get("importance", "N/A")
         date_str = meta.get("timestamp_event", "N/A")
         content = mem.get("content", "").replace("\n", " ")

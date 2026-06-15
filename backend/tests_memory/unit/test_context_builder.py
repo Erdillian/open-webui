@@ -56,7 +56,7 @@ class TestBuildMemoriesBlock:
 
     def test_single_memory(self):
         memories = [
-            {"content": "L'utilisateur aime le café.", "meta": {"importance": 0.8, "timestamp_event": "2024-01-01"}}
+            {"content": "L'utilisateur aime le café.", "metadata": {"importance": 0.8, "timestamp_event": "2024-01-01"}}
         ]
         block = _build_memories_block(memories)
         assert "<relevant_memories>" in block
@@ -66,7 +66,7 @@ class TestBuildMemoriesBlock:
 
     def test_multiline_content(self):
         memories = [
-            {"content": "Line one\nLine two", "meta": {"importance": 0.5, "timestamp_event": "N/A"}}
+            {"content": "Line one\nLine two", "metadata": {"importance": 0.5, "timestamp_event": "N/A"}}
         ]
         block = _build_memories_block(memories)
         # Content should be flattened to single line
