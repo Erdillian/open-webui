@@ -177,15 +177,21 @@ def query_memories(
     embedding: list[float],
     filter_dict: Optional[dict] = None,
     k: int = 20,
+    include_embeddings: bool = True,
 ) -> dict:
     """Query the memory collection for nearest neighbors.
 
-    Returns raw ChromaDB result dict with keys: ids, distances, documents, metadatas.
+    Returns raw ChromaDB result dict with keys: ids, distances, documents,
+    metadatas, and embeddings (when include_embeddings is True).
     """
     collection = get_memory_collection()
+    include = ["distances", "documents", "metadatas"]
+    if include_embeddings:
+        include.append("embeddings")
     result = collection.query(
         query_embeddings=[embedding],
         n_results=k,
         where=filter_dict,
+        include=include,
     )
     return result

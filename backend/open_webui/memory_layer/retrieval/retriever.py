@@ -124,6 +124,7 @@ async def search_memories(
     distances = raw_result.get("distances", [[]])[0]
     documents = raw_result.get("documents", [[]])[0]
     metadatas = raw_result.get("metadatas", [[]])[0]
+    embeddings = raw_result.get("embeddings", [[]])[0]
 
     if not ids:
         return []
@@ -139,6 +140,7 @@ async def search_memories(
         distance = distances[i] if i < len(distances) else 1.0
         document = documents[i] if i < len(documents) else ""
         meta = metadatas[i] if i < len(metadatas) else {}
+        memory_embedding = embeddings[i] if i < len(embeddings) and embeddings[i] else query_embedding
 
         # Extract fields from metadata (stored as strings in ChromaDB)
         importance = float(meta.get("importance", 0.5))
@@ -147,10 +149,6 @@ async def search_memories(
         timestamp_str = meta.get("timestamp_event")
         timestamp = int(timestamp_str) if timestamp_str and str(timestamp_str).isdigit() else None
 
-        # Get memory embedding from ChromaDB (not returned by query, so we approximate)
-        # For accurate scoring we'd need the memory embedding; ChromaDB query doesn't return it.
-        # We'll use query_embedding as a proxy for the memory_embedding in sensitivity calculation.
-        # This is slightly inaccurate but avoids an extra get() call per result.
         score = _score_memory(
             cosine_distance=distance,
             importance=importance,
@@ -158,7 +156,7 @@ async def search_memories(
             pinned=pinned,
             sensitivity=sensitivity,
             query_embedding=query_embedding,
-            memory_embedding=query_embedding,  # Approximation
+            memory_embedding=memory_embedding,
         )
 
         scored.append(
