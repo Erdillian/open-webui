@@ -31,10 +31,25 @@ async def update_conflict_status(
     conflict_id: int,
     new_status: str,
     resolution_memory_id: Optional[int] = None,
+    user_id: Optional[str] = None,
 ) -> Optional[MemoryConflict]:
-    """Update the status of a conflict."""
+    """Update the status of a conflict.
+
+    Args:
+        conflict_id: ID of the conflict to update.
+        new_status: New status value.
+        resolution_memory_id: Optional memory item that resolves the conflict.
+        user_id: Optional user ID used to scope the lookup. If provided, the
+            conflict is only returned when it belongs to this user.
+    """
     async with get_async_db() as db:
-        conflict = await db.get(MemoryConflict, conflict_id)
+        from sqlalchemy import select
+
+        stmt = select(MemoryConflict).where(MemoryConflict.id == conflict_id)
+        if user_id is not None:
+            stmt = stmt.where(MemoryConflict.user_id == user_id)
+        result = await db.execute(stmt)
+        conflict = result.scalar_one_or_none()
         if not conflict:
             return None
         conflict.status = new_status
