@@ -140,7 +140,11 @@ async def search_memories(
         distance = distances[i] if i < len(distances) else 1.0
         document = documents[i] if i < len(documents) else ""
         meta = metadatas[i] if i < len(metadatas) else {}
-        memory_embedding = embeddings[i] if i < len(embeddings) and embeddings[i] else query_embedding
+        memory_embedding = (
+            embeddings[i]
+            if i < len(embeddings) and embeddings[i] is not None and len(embeddings[i]) > 0
+            else query_embedding
+        )
 
         # Extract fields from metadata (stored as strings in ChromaDB)
         importance = float(meta.get("importance", 0.5))

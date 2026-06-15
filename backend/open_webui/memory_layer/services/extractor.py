@@ -101,7 +101,7 @@ async def _detect_duplicates(
         distance = distances[i] if i < len(distances) else 1.0
         similarity = 1.0 - distance
         if similarity >= threshold:
-            metas = results.get("metas", [[]])[0]
+            metas = results.get("metadatas", [[]])[0]
             meta = metas[i] if i < len(metas) else {}
             return {"chroma_id": chroma_id, "meta": meta, "similarity": similarity}
     return None
@@ -126,7 +126,7 @@ async def _detect_conflicts(
     ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
     documents = results.get("documents", [[]])[0]
-    metas = results.get("metas", [[]])[0]
+    metas = results.get("metadatas", [[]])[0]
 
     conflicts = []
     for i, chroma_id in enumerate(ids):

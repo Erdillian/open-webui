@@ -45,7 +45,7 @@ async def async_client(app):
 class TestExportMemory:
     @pytest.mark.anyio
     async def test_export_memory(
-        self, db_session, async_client, monkeypatch
+        self, db_session, app, async_client, monkeypatch
     ):
         from contextlib import asynccontextmanager
 
@@ -53,21 +53,33 @@ class TestExportMemory:
         async def _mock_db():
             yield db_session
 
-        monkeypatch.setattr("open_webui.internal.db.get_async_db", _mock_db)
+        monkeypatch.setattr("open_webui.memory_layer.routers.export.get_async_db", _mock_db)
+
+        # Use a distinct user to avoid cross-test contamination in the shared file DB
+        export_user = UserModel(
+            id="test-user-export",
+            email="export@example.com",
+            name="Export User",
+            role="user",
+            last_active_at=0,
+            updated_at=0,
+            created_at=0,
+        )
+        app.dependency_overrides[get_verified_user] = lambda: export_user
 
         profile = UserProfile(
-            user_id="test-user-1",
+            user_id="test-user-export",
             executive_summary="Test summary",
             full_profile_json={"key": "value"},
         )
         item = MemoryItem(
-            user_id="test-user-1",
+            user_id="test-user-export",
             content="Test memory",
             category="fact",
             importance=0.7,
             sensitivity=0.0,
         )
-        tag = MemoryTag(user_id="test-user-1", name="test-tag", color="#fff")
+        tag = MemoryTag(user_id="test-user-export", name="test-tag", color="#fff")
         db_session.add_all([profile, item, tag])
         await db_session.commit()
         await db_session.refresh(item)
@@ -78,7 +90,7 @@ class TestExportMemory:
         response = await async_client.get("/api/mem/export/export")
         assert response.status_code == 200
         data = response.json()
-        assert data["user_id"] == "test-user-1"
+        assert data["user_id"] == "test-user-export"
         assert data["profile"]["executive_summary"] == "Test summary"
         assert len(data["memory_items"]) == 1
         assert data["memory_items"][0]["content"] == "Test memory"
@@ -97,7 +109,7 @@ class TestImportMemory:
         async def _mock_db():
             yield db_session
 
-        monkeypatch.setattr("open_webui.internal.db.get_async_db", _mock_db)
+        monkeypatch.setattr("open_webui.memory_layer.routers.export.get_async_db", _mock_db)
         monkeypatch.setattr(
             "open_webui.memory_layer.embeddings.ollama_embed.embed_text",
             lambda text: [0.1] * 384,
