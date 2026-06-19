@@ -191,9 +191,53 @@ A real browser test was run against a local backend (port 8081) with `llama3.1:8
 - Pagination and `GET /memory/{id}` endpoint to avoid full list in audit page
 - Rate limiting / back-pressure on profile regeneration and LLM calls
 
+## User Journey: Unified ChatGPT + Anthropic Memory Import
+
+On 2026-06-19 a unified user profile was built from a ChatGPT export (`conversations-000.json`) and an Anthropic export (`conversations.json`), then seeded into a live `memory_layer` instance for a real end-to-end validation.
+
+### Pipeline
+
+1. **Exports parsed**
+   - ChatGPT: 71 durable facts (2023-2024 window)
+   - Anthropic: 552 durable facts (2025-2026 window)
+2. **Deduplication / merge** → `unified_import_profile.json`
+   - Final set: **400 memories**
+   - Single `executive_summary` and structured `profile_json`
+   - Contradictions resolved by keeping the most recent source (Anthropic for 2025-2026, ChatGPT for complementary older context)
+3. **Seeding** → `seed_import_memory.py`
+   - Created `admin@local.dev` / `admin123` if missing
+   - Embedded all 400 memories with `nomic-embed-text` via Ollama
+   - Inserted into SQLite (`mem_items`, `mem_profile`) + ChromaDB (`memory_items`)
+4. **Live backend test**
+   - `.env` updated to absolute paths so DB/ChromaDB are consistent regardless of launch directory
+   - `start_user_journey.ps1` launched uvicorn on port 8081
+
+### Results
+
+| Check | Result |
+|---|---|
+| DB `mem_items` count | ✅ 400 |
+| DB `mem_profile` count | ✅ 1 |
+| ChromaDB `memory_items` count | ✅ 478 (includes earlier test vectors) |
+| Sign-in returns seeded user_id | ✅ `f0809d24-f8fd-427b-aade-005dc94cfaef` |
+| `GET /api/mem/profile/` | ✅ `onboarding_done: true`, regenerated executive summary present |
+| `GET /api/mem/memory/` | ✅ 400 memories returned |
+| Direct vector retrieval (`search_memories`) | ✅ Returns scored results for French queries |
+| Backend log | ✅ No critical errors; profile worker completed full regen |
+
+> **Verdict: UNIFIED IMPORT USER JOURNEY PASSED.** The `memory_layer` correctly ingests memories spanning two distinct export time windows, deduplicates them, regenerates the executive profile, and serves them through the live API.
+
+### Artifacts
+
+- `open-webui-fork/unified_import_profile.json` — merged profile ready for seeding
+- `open-webui-fork/seed_import_memory.py` — generic seeder for any profile JSON
+- `open-webui-fork/chatgpt_import_profile.json` — original ChatGPT-derived profile
+- `open-webui-fork/anthropic_import_profile.json` — Anthropic-derived profile
+
 ### Recommended Next Steps
 
 1. Merge `fix-memory-layer-p0-p1` into `feat/memory-layer`.
 2. Rebase `feat/memory-layer` onto upstream `main` and run the full Open WebUI test suite.
 3. Address the non-blocking improvements in a follow-up iteration.
 4. Add `@pytest.mark.slow` tests against a real Ollama instance for continuous E2E validation.
+5. Build the Open WebUI frontend (`npm run build`) so the launcher can serve the UI at `/` instead of testing against the API only.

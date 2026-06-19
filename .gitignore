@@ -10,6 +10,13 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# User Journey / memory import artifacts (contain personal data)
+*_import_profile.json
+test_e2e_playwright.db*
+backend/test_e2e_playwright.db*
+backend_user_journey.log
+seed_unified.log
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
