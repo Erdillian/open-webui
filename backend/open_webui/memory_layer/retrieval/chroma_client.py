@@ -109,6 +109,61 @@ def add_memory(
     return chroma_id
 
 
+def get_memory(chroma_id: str) -> Optional[dict]:
+    """Fetch a single memory item by chroma_id.
+
+    Returns a dict with keys: id, embedding, document, metadata, or None.
+    """
+    collection = get_memory_collection()
+    try:
+        result = collection.get(
+            ids=[chroma_id],
+            include=["embeddings", "documents", "metadatas"],
+        )
+        if not result.get("ids") or not result["ids"]:
+            return None
+        return {
+            "id": result["ids"][0],
+            "embedding": result.get("embeddings", [[]])[0],
+            "document": result.get("documents", [""])[0],
+            "metadata": result.get("metadatas", [{}])[0],
+        }
+    except Exception as e:
+        log.warning(f"Failed to get memory {chroma_id}: {e}")
+        return None
+
+
+def update_memory(
+    chroma_id: str,
+    content: Optional[str] = None,
+    metadata: Optional[dict] = None,
+    embedding: Optional[list[float]] = None,
+) -> None:
+    """Update a memory item in ChromaDB by chroma_id.
+
+    Only provided fields are updated. Metadata values are flattened for
+    ChromaDB serialization.
+    """
+    collection = get_memory_collection()
+    try:
+        kwargs: dict = {"ids": [chroma_id]}
+        if content is not None:
+            kwargs["documents"] = [content]
+        if embedding is not None:
+            kwargs["embeddings"] = [embedding]
+        if metadata is not None:
+            flat_metadata = {}
+            for key, value in metadata.items():
+                if isinstance(value, (str, int, float, bool)):
+                    flat_metadata[key] = value
+                else:
+                    flat_metadata[key] = str(value)
+            kwargs["metadatas"] = [flat_metadata]
+        collection.update(**kwargs)
+    except Exception as e:
+        log.warning(f"Failed to update memory {chroma_id}: {e}")
+
+
 def delete_memory(chroma_id: str) -> None:
     """Delete a memory item by chroma_id."""
     collection = get_memory_collection()
@@ -122,15 +177,21 @@ def query_memories(
     embedding: list[float],
     filter_dict: Optional[dict] = None,
     k: int = 20,
+    include_embeddings: bool = True,
 ) -> dict:
     """Query the memory collection for nearest neighbors.
 
-    Returns raw ChromaDB result dict with keys: ids, distances, documents, metadatas.
+    Returns raw ChromaDB result dict with keys: ids, distances, documents,
+    metadatas, and embeddings (when include_embeddings is True).
     """
     collection = get_memory_collection()
+    include = ["distances", "documents", "metadatas"]
+    if include_embeddings:
+        include.append("embeddings")
     result = collection.query(
         query_embeddings=[embedding],
         n_results=k,
         where=filter_dict,
+        include=include,
     )
     return result

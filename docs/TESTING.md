@@ -52,9 +52,9 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 
 ## Latest Run Summary
 
-- **Date**: 2026-06-02
-- **Result**: 68 passed, 0 failed
-- **Duration**: ~2.7s
+- **Date**: 2026-06-15
+- **Result**: 73 passed, 0 failed
+- **Duration**: ~25s
 - **Python**: 3.12.10
 - **Plugins**: anyio-4.13.0, randomly-4.1.0
 
@@ -62,12 +62,13 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 
 | Phase | File(s) | Count | Status |
 |-------|---------|-------|--------|
-| Unit | `test_retrieval.py` | 9 | ✅ Pass |
+| Unit | `test_retrieval.py` | 10 | ✅ Pass |
 | Unit | `test_context_builder.py` | 12 | ✅ Pass |
 | Unit | `test_conflict_detection.py` | 5 | ✅ Pass |
-| Unit | `test_router_memory.py` | 12 | ✅ Pass |
+| Unit | `test_router_memory.py` | 13 | ✅ Pass |
 | Unit | `test_router_profile.py` | 7 | ✅ Pass |
 | Unit | `test_router_conflicts.py` | 6 | ✅ Pass |
+| Unit | `test_router_export.py` | 5 | ✅ Pass |
 | Integration | `test_extraction.py` | 2 | ✅ Pass |
 | Integration | `test_profile_worker.py` | 1 | ✅ Pass |
 | E2E | `test_e2e_scenarios.py` | 8 | ✅ Pass |
@@ -82,6 +83,7 @@ pytest tests_memory --cov=open_webui.memory_layer --cov-report=html
 5. **Profile schema mismatch**: Added `memories_since_regen=0` to `UserProfile` test objects to satisfy Pydantic validation.
 6. **DB isolation**: Cleanup moved into `db_session` fixture teardown to prevent data leakage between router tests.
 7. **Async fixture warnings**: Removed standalone `clean_memory_tables` async autouse fixture; cleanup now happens inside `db_session` teardown, avoiding `PytestRemovedIn9Warning` on sync tests.
+8. **Windows UTF-8 smoke test**: Forced `sys.stdout/stderr.reconfigure(encoding='utf-8')` in `functional_smoke_test.py` to prevent `UnicodeEncodeError` from the banner ASCII art.
 
 ## Fixtures
 
@@ -131,8 +133,111 @@ A standalone script (`tests_memory/functional_smoke_test.py`) imports the full F
 
 > **Verdict: memory_layer is FUNCTIONALLY OPERATIONAL.**
 
-## Next Steps / Extension Ideas
+## Thorough Review & Live End-to-End Test
 
-- Add `@pytest.mark.slow` tests that run against a real Ollama instance for end-to-end validation.
-- Add `scripts/extract_facts_from_openai_export.py` to regenerate `user_facts.json` automatically from a new ChatGPT export.
-- Add performance regression tests for retrieval latency as the memory store grows.
+A multi-agent thorough review was executed on 2026-06-15 against the plan in `.claude/plans/thorough_testing_plan.md`. The review covered backend routers, workers/lifecycle, filter-function integration, retrieval/embeddings, frontend UX, audit/security, and a completeness critic.
+
+### Critical / High Findings Fixed
+
+| ID | Finding | Files | Status |
+|---|---|---|---|
+| P0-01 | Conflict status update lacked `user_id` ownership check | `services/conflict_service.py`, `routers/conflicts.py` | ✅ Fixed |
+| P0-02 | Import/export asymmetric, no Pydantic validation | `routers/export.py` | ✅ Fixed |
+| P0-03 | Sensitivity penalty used query embedding as memory embedding | `retrieval/chroma_client.py`, `retrieval/retriever.py` | ✅ Fixed |
+| P0-04 | PATCH memory did not sync ChromaDB | `retrieval/chroma_client.py`, `routers/memory.py` | ✅ Fixed |
+| P0-05 | Conflicts stored `memory_b_id = new memory` (self-referential) | `services/extractor.py` | ✅ Fixed |
+| P1-06 | SQL/PRAGMA injection via f-string on `DATABASE_PASSWORD` | `internal/db.py`, `migrations/env.py` | ✅ Fixed |
+| P1-07/P1-08 | Metadata key mismatch (`meta` vs `metadata`), profile not injected, `chat_id` lost in streaming | `services/context_builder.py`, `tools/search_memory.py`, `functions/memory_filter.py` | ✅ Fixed |
+| — | NumPy boolean ambiguity in `retriever.py` | `retrieval/retriever.py` | ✅ Fixed |
+| — | Wrong Chroma key `metas` instead of `metadatas` in duplicate/conflict detection | `services/extractor.py` | ✅ Fixed |
+
+### Commits
+
+All fixes are on branch `fix-memory-layer-p0-p1`:
+
+- `d75590ec8` fix(P0-01): scope conflict status update to authenticated user
+- `6b5a603e0` fix(P0-02): symmetric, validated, idempotent memory import/export
+- `f26cf4c4a` fix(P0-03): use real Chroma embeddings for sensitivity penalty
+- `c87296dfb` fix(P0-04): sync ChromaDB on memory PATCH
+- `84495a16b` fix(P0-05): avoid self-referential conflict records
+- `5d28320aa` fix(P1-06): secure SQLCipher PRAGMA key against injection
+- `b79946692` fix(P1-07/P1-08): align memory metadata key and inject profile summary
+- `1ead3794a` fix(retrieval): avoid NumPy boolean ambiguity and correct Chroma metadata key
+
+### Live E2E Result
+
+A real browser test was run against a local backend (port 8081) with `llama3.1:8b`:
+
+| Step | Result |
+|---|---|
+| Backend + frontend up | ✅ |
+| User signup | ✅ `test-vegetarien@example.com` |
+| Playwright login | ✅ |
+| Message: « Je suis végétarien et j'habite en Ardèche » | ✅ |
+| Async extraction | ✅ 1 memory extracted: "L'utilisateur est végétarien." |
+| New chat: « Qu'est-ce que je mange ce soir ? » | ✅ |
+| Response contains vegetarian hint | ✅ Keywords: **végétarien**, **diète** |
+| `/memory` page displays memory | ✅ |
+| No critical backend errors | ✅ |
+
+> **Verdict: LIVE END-TO-END TEST PASSED.**
+
+### Remaining Non-Blocking Improvements
+
+- Frontend i18n, dark mode Tailwind variants, mutation error/loading states
+- Worker graceful shutdown, hook or remove `document_to_memory.py`
+- Audit events for manual memory creation, conflict resolution, profile edits, import/export
+- Frontend tests (Vitest) for `api.ts`, `MemoryList`, `OnboardingModal`
+- Pagination and `GET /memory/{id}` endpoint to avoid full list in audit page
+- Rate limiting / back-pressure on profile regeneration and LLM calls
+
+## User Journey: Unified ChatGPT + Anthropic Memory Import
+
+On 2026-06-19 a unified user profile was built from a ChatGPT export (`conversations-000.json`) and an Anthropic export (`conversations.json`), then seeded into a live `memory_layer` instance for a real end-to-end validation.
+
+### Pipeline
+
+1. **Exports parsed**
+   - ChatGPT: 71 durable facts (2023-2024 window)
+   - Anthropic: 552 durable facts (2025-2026 window)
+2. **Deduplication / merge** → `unified_import_profile.json`
+   - Final set: **400 memories**
+   - Single `executive_summary` and structured `profile_json`
+   - Contradictions resolved by keeping the most recent source (Anthropic for 2025-2026, ChatGPT for complementary older context)
+3. **Seeding** → `seed_import_memory.py`
+   - Created `admin@local.dev` / `admin123` if missing
+   - Embedded all 400 memories with `nomic-embed-text` via Ollama
+   - Inserted into SQLite (`mem_items`, `mem_profile`) + ChromaDB (`memory_items`)
+4. **Live backend test**
+   - `.env` updated to absolute paths so DB/ChromaDB are consistent regardless of launch directory
+   - `start_user_journey.ps1` launched uvicorn on port 8081
+
+### Results
+
+| Check | Result |
+|---|---|
+| DB `mem_items` count | ✅ 400 |
+| DB `mem_profile` count | ✅ 1 |
+| ChromaDB `memory_items` count | ✅ 478 (includes earlier test vectors) |
+| Sign-in returns seeded user_id | ✅ `f0809d24-f8fd-427b-aade-005dc94cfaef` |
+| `GET /api/mem/profile/` | ✅ `onboarding_done: true`, regenerated executive summary present |
+| `GET /api/mem/memory/` | ✅ 400 memories returned |
+| Direct vector retrieval (`search_memories`) | ✅ Returns scored results for French queries |
+| Backend log | ✅ No critical errors; profile worker completed full regen |
+
+> **Verdict: UNIFIED IMPORT USER JOURNEY PASSED.** The `memory_layer` correctly ingests memories spanning two distinct export time windows, deduplicates them, regenerates the executive profile, and serves them through the live API.
+
+### Artifacts
+
+- `open-webui-fork/unified_import_profile.json` — merged profile ready for seeding
+- `open-webui-fork/seed_import_memory.py` — generic seeder for any profile JSON
+- `open-webui-fork/chatgpt_import_profile.json` — original ChatGPT-derived profile
+- `open-webui-fork/anthropic_import_profile.json` — Anthropic-derived profile
+
+### Recommended Next Steps
+
+1. Merge `fix-memory-layer-p0-p1` into `feat/memory-layer`.
+2. Rebase `feat/memory-layer` onto upstream `main` and run the full Open WebUI test suite.
+3. Address the non-blocking improvements in a follow-up iteration.
+4. Add `@pytest.mark.slow` tests against a real Ollama instance for continuous E2E validation.
+5. Build the Open WebUI frontend (`npm run build`) so the launcher can serve the UI at `/` instead of testing against the API only.

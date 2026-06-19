@@ -14,6 +14,10 @@ import tempfile
 import traceback
 from pathlib import Path
 
+# ── Force UTF-8 output on Windows to avoid UnicodeEncodeError ────────────────
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 # ── Path setup ──────────────────────────────────────────────────────────────
 BACKEND_DIR = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(BACKEND_DIR))

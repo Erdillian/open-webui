@@ -198,6 +198,14 @@ class TestUpdateMemory:
         self, db_session, async_client, mock_get_async_db, monkeypatch
     ):
         monkeypatch.setattr("open_webui.internal.db.get_async_db", mock_get_async_db)
+        monkeypatch.setattr(
+            "open_webui.memory_layer.embeddings.ollama_embed.embed_text",
+            lambda text: [0.1] * 384,
+        )
+        monkeypatch.setattr(
+            "open_webui.memory_layer.retrieval.chroma_client.update_memory",
+            lambda chroma_id, content=None, metadata=None, embedding=None: None,
+        )
 
         async def mock_trace_event(**kwargs):
             return None
@@ -209,6 +217,7 @@ class TestUpdateMemory:
         item = MemoryItem(
             user_id="test-user-1",
             content="Old content",
+            chroma_id="chroma-abc",
             importance=0.5,
             sensitivity=0.0,
         )

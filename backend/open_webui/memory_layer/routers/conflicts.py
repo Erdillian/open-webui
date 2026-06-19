@@ -42,6 +42,7 @@ async def patch_conflict(
         conflict_id=conflict_id,
         new_status=data.status,
         resolution_memory_id=data.resolution_memory_id,
+        user_id=user.id,
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Conflict not found")

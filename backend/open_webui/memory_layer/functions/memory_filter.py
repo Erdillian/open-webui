@@ -54,6 +54,17 @@ class Filter:
                     user_message = msg.get("content", "")
                     break
 
+            # Load executive summary for profile injection
+            executive_summary = ""
+            try:
+                from open_webui.memory_layer.services.profile_service import get_profile
+
+                profile = await get_profile(user_id)
+                if profile:
+                    executive_summary = profile.executive_summary or ""
+            except Exception:
+                pass
+
             # Build enriched system prompt
             system_prompt = await build_system_prompt(
                 user_id=user_id,
@@ -61,6 +72,7 @@ class Filter:
                 chat_history=messages,
                 k_passive=self.valves.k_passive,
                 anti_sycophancy=self.valves.anti_sycophancy_enabled,
+                executive_summary=executive_summary,
             )
 
             # Inject or replace system message
@@ -129,7 +141,9 @@ class Filter:
                 return body
 
             messages = body.get("messages", [])
-            chat_id = body.get("chat_id")
+            chat_id = body.get("metadata", {}).get("chat_id") if body.get("metadata") else None
+            if chat_id is None:
+                chat_id = body.get("chat_id")
             log.info(f"memory_filter outlet: user={user_id}, chat_id={chat_id}, messages_count={len(messages)}")
 
             # If assistant response is not yet in body (streaming), fetch from DB

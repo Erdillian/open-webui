@@ -138,11 +138,12 @@ class TestPatchConflict:
         )
 
         async def mock_update_conflict_status(
-            conflict_id, new_status, resolution_memory_id=None
+            conflict_id, new_status, resolution_memory_id=None, user_id=None
         ):
             assert conflict_id == 1
             assert new_status == "resolved"
             assert resolution_memory_id == 50
+            assert user_id == "test-user-1"
             return conflict
 
         monkeypatch.setattr(
@@ -160,8 +161,9 @@ class TestPatchConflict:
     @pytest.mark.anyio
     async def test_patch_conflict_not_found(self, async_client, monkeypatch):
         async def mock_update_conflict_status(
-            conflict_id, new_status, resolution_memory_id=None
+            conflict_id, new_status, resolution_memory_id=None, user_id=None
         ):
+            assert user_id == "test-user-1"
             return None
 
         monkeypatch.setattr(
@@ -188,11 +190,12 @@ class TestPatchConflict:
         )
 
         async def mock_update_conflict_status(
-            conflict_id, new_status, resolution_memory_id=None
+            conflict_id, new_status, resolution_memory_id=None, user_id=None
         ):
             assert conflict_id == 2
             assert new_status == "dismissed"
             assert resolution_memory_id is None
+            assert user_id == "test-user-1"
             return conflict
 
         monkeypatch.setattr(

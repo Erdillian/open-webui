@@ -101,7 +101,7 @@ async def _detect_duplicates(
         distance = distances[i] if i < len(distances) else 1.0
         similarity = 1.0 - distance
         if similarity >= threshold:
-            metas = results.get("metas", [[]])[0]
+            metas = results.get("metadatas", [[]])[0]
             meta = metas[i] if i < len(metas) else {}
             return {"chroma_id": chroma_id, "meta": meta, "similarity": similarity}
     return None
@@ -126,7 +126,7 @@ async def _detect_conflicts(
     ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
     documents = results.get("documents", [[]])[0]
-    metas = results.get("metas", [[]])[0]
+    metas = results.get("metadatas", [[]])[0]
 
     conflicts = []
     for i, chroma_id in enumerate(ids):
@@ -293,10 +293,28 @@ async def extract_memories_from_exchange(
                 for conflict in conflicts:
                     from open_webui.memory_layer.models.conflict import MemoryConflict
 
+                    # Use the existing memory ID stored in Chroma metadata to avoid
+                    # a self-referential conflict entry.
+                    existing_memory_id = None
+                    conflict_meta = conflict.get("meta") or {}
+                    existing_memory_id_raw = conflict_meta.get("memory_item_id")
+                    if existing_memory_id_raw is not None:
+                        try:
+                            existing_memory_id = int(existing_memory_id_raw)
+                        except (ValueError, TypeError):
+                            existing_memory_id = None
+
+                    if existing_memory_id is None or existing_memory_id == memory_item.id:
+                        log.warning(
+                            f"Conflict detected but existing memory_id missing or identical "
+                            f"to new memory {memory_item.id}; skipping conflict record."
+                        )
+                        continue
+
                     conflict_entry = MemoryConflict(
                         user_id=user_id,
                         memory_a_id=memory_item.id,
-                        memory_b_id=memory_item.id,
+                        memory_b_id=existing_memory_id,
                         similarity_score=conflict["similarity"],
                         status="pending",
                         detected_at=now,
