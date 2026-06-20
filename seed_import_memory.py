@@ -157,6 +157,7 @@ async def seed_memories(user_id: str, memories: list[dict]):
                 "pinned": item.pinned,
                 "archived": item.archived,
                 "timestamp_event": str(timestamp_event) if timestamp_event else "",
+                "memory_item_id": item.id,
             }
             chroma_id = add_memory(embedding=embedding, content=content, metadata=metadata)
 

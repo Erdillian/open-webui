@@ -304,10 +304,19 @@ async def extract_memories_from_exchange(
                         except (ValueError, TypeError):
                             existing_memory_id = None
 
-                    if existing_memory_id is None or existing_memory_id == memory_item.id:
-                        log.warning(
-                            f"Conflict detected but existing memory_id missing or identical "
-                            f"to new memory {memory_item.id}; skipping conflict record."
+                    if existing_memory_id == memory_item.id:
+                        # Skip self-referential conflicts (the newly inserted memory itself).
+                        log.debug(
+                            f"Conflict detection skipped self-reference for memory {memory_item.id}."
+                        )
+                        continue
+
+                    if existing_memory_id is None:
+                        # Existing Chroma entry lacks a linked DB memory_id (e.g. legacy/imported memory).
+                        # We cannot create a conflict record without the DB id, so skip gracefully.
+                        log.debug(
+                            f"Conflict detected but existing Chroma entry has no memory_item_id; "
+                            f"skipping conflict record for new memory {memory_item.id}."
                         )
                         continue
 
