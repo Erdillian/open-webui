@@ -1,5 +1,7 @@
 """Build the enriched system prompt injected before every LLM call."""
+import asyncio
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Optional
@@ -66,6 +68,153 @@ def _build_memories_block(memories: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _generate_search_queries(user_message: str) -> list[str]:
+    """Generate a diverse set of semantic search queries from a user message.
+
+    The goal is to maximize recall: different phrasings surface different memories.
+    """
+    # Common French and English stop words + generic verbs to ignore
+    stop_words = {
+        "fais", "faire", "donne", "donner", "dis", "dire", "explique", "expliquer",
+        "resume", "resumer", "liste", "lister", "cherche", "chercher", "trouve", "trouver",
+        "suis", "es", "est", "sommes", "etes", "sont", "ai", "as", "a", "avons", "avez", "ont",
+        "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles", "moi", "toi", "lui",
+        "mon", "ton", "son", "notre", "votre", "leur", "ma", "ta", "sa", "mes", "tes", "ses",
+        "nos", "vos", "leurs", "un", "une", "le", "la", "les", "des", "du", "de", "et", "ou",
+        "mais", "donc", "or", "ni", "car", "que", "qui", "quoi", "dont", "ou", "quand", "comment",
+        "pourquoi", "parce", "avec", "sans", "dans", "sur", "sous", "par", "pour", "contre",
+        "vers", "entre", "parmi", "tout", "tous", "toute", "toutes", "chaque", "plusieurs",
+        "quelques", "certains", "certaines", "autre", "autres", "meme", "memes", "seul",
+        "seule", "seuls", "seules", "tres", "peu", "beaucoup", "trop", "assez", "bien",
+        "mal", "oui", "non", "peut", "peux", "pouvoir", "veux", "vouloir", "dois", "devoir",
+        "doit", "fais", "fait", "falloir", "aller", "venir", "voir", "savoir", "penser",
+        "pense", "croire", "croit", "travail", "travailler", "vie", "vivre", "personne",
+        "quelqu", "quelque", "chose", "rien", "tout", "tous", "aussi", "alors", "ainsi",
+        "avant", "apres", "encore", "deja", "toujours", "jamais", "souvent", "parfois",
+        "maintenant", "aujourd", "hier", "demain", "ici", "la", "bas", "dois", "peut",
+        "make", "give", "tell", "explain", "list", "search", "find", "look", "who", "what",
+        "where", "when", "why", "how", "am", "is", "are", "was", "were", "be", "been",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
+        "may", "might", "can", "shall", "i", "you", "he", "she", "it", "we", "they",
+        "me", "him", "her", "us", "them", "my", "your", "his", "its", "our", "their",
+        "this", "that", "these", "those", "a", "an", "the", "and", "or", "but", "if",
+        "then", "else", "of", "in", "on", "at", "to", "from", "by", "with", "about",
+        "as", "into", "through", "during", "before", "after", "above", "below", "up",
+        "down", "out", "off", "over", "under", "again", "further", "then", "once",
+    }
+
+    msg = user_message.strip()
+    if not msg:
+        return []
+
+    queries = set()
+
+    # Main query: the message itself (may help when phrasing is specific)
+    queries.add(msg)
+
+    # Detect broad/personal/profile questions and inject domain-specific queries
+    lower_msg = msg.lower()
+    broad_indicators = [
+        "profil", "résum", "resum", "exhausti", "parle-moi", "parle moi",
+        "qui je suis", "qui suis-je", "qui suis je", "qui je suis",
+        "dis-moi tout", "dis moi tout", "rappelle-moi", "rappelle moi",
+        "tout sur moi", "à propos de moi", "a propos de moi",
+        "ma vie", "mon profil", "mes infos", "mes informations",
+    ]
+    is_broad = any(ind in lower_msg for ind in broad_indicators)
+
+    if is_broad:
+        # Domain-specific semantic probes to maximize recall on a full profile
+        queries.add("travail métier rôle entreprise Didask prompt engineer concepteur pédagogique")
+        queries.add("santé corps poids musculation sport fitness vasectomie méditation")
+        queries.add("famille parents père mère frère Richad relations proches enfants adoption")
+        queries.add("loisirs hobbies passions cirque pole dance mât chinois jeux musique poésie cuisine")
+        queries.add("projets ambitions crypto token STAKEPOT assistant Claude atelier gouvernance indépendance financière")
+        queries.add("lieu vie Joyeuse Ardèche maison colocation jardin forêt")
+        queries.add("relations amicales amour ruptures Zélia Maritchu amis Thibaut Nono Ambre")
+        queries.add("valeurs sobriété alcool politique spiritualité engagement associatif KiCaféCa Chouette Guinguette")
+    else:
+        # Always surface core identity / life context for other questions too
+        queries.add("profil identité travail lieu vie santé famille relations hobbies projets")
+
+    # Extract content words (3+ chars, letters/hyphens only)
+    tokens = re.findall(r"[A-Za-zÀ-ÿ\-]{3,}", msg.lower())
+    content_tokens = [t for t in tokens if t not in stop_words]
+
+    # Single terms
+    for t in content_tokens[:10]:
+        queries.add(t)
+
+    # Pairs of consecutive content terms (preserve order)
+    for i in range(len(content_tokens) - 1):
+        queries.add(f"{content_tokens[i]} {content_tokens[i + 1]}")
+
+    # Triplets when available (more precise semantic matches)
+    for i in range(len(content_tokens) - 2):
+        queries.add(f"{content_tokens[i]} {content_tokens[i + 1]} {content_tokens[i + 2]}")
+
+    # Filter out overly generic / short queries
+    filtered = []
+    for q in queries:
+        words = [w for w in q.split() if w not in stop_words]
+        if len(words) >= 1 and len(q) >= 4:
+            filtered.append(q)
+
+    # Prioritize longer, richer queries (domain probes first when broad)
+    filtered.sort(key=lambda q: (len(q.split()), len(q)), reverse=True)
+    return filtered[:20]
+
+
+async def _retrieve_memories_exhaustive(
+    user_id: str,
+    user_message: str,
+    k_per_query: int = 8,
+    max_memories: int = 24,
+) -> list[dict]:
+    """Run parallel semantic searches and merge/deduplicate results.
+
+    Returns memories sorted by composite score, capped at max_memories.
+    """
+    queries = _generate_search_queries(user_message)
+    if not queries:
+        return []
+
+    # Cap k to avoid flooding ChromaDB
+    if k_per_query < 1:
+        k_per_query = 1
+    if k_per_query > 15:
+        k_per_query = 15
+
+    async def _search_one(query: str) -> list[dict]:
+        try:
+            return await search_memories(
+                user_id=user_id,
+                query=query,
+                k=k_per_query,
+            )
+        except Exception as e:
+            log.warning(f"Exhaustive retrieval failed for query '{query[:40]}': {e}")
+            return []
+
+    results_per_query = await asyncio.gather(*[_search_one(q) for q in queries])
+
+    # Merge by chroma_id / content, keeping best score
+    seen = {}
+    for results in results_per_query:
+        for r in results:
+            content = r.get("content", "").strip()
+            if not content:
+                continue
+            key = r.get("id") or content
+            score = r.get("score", 0.0) or 0.0
+            if key not in seen or seen[key].get("score", 0.0) < score:
+                seen[key] = r
+
+    merged = list(seen.values())
+    merged.sort(key=lambda x: x.get("score", 0.0) or 0.0, reverse=True)
+    return merged[:max_memories]
+
+
 def _build_profile_block(executive_summary: str) -> str:
     if not executive_summary:
         return ""
@@ -121,14 +270,15 @@ async def build_system_prompt(
     if k_passive <= 0:
         k_passive = config.MEM_DEFAULT_K_PASSIVE
 
-    # Retrieve relevant memories
+    # Retrieve relevant memories exhaustively via parallel semantic searches
     try:
-        memories = await search_memories(
+        # Run multiple queries in parallel and merge results for broader recall
+        top_memories = await _retrieve_memories_exhaustive(
             user_id=user_id,
-            query=user_message,
-            k=k_passive * 3,  # Retrieve more for better filtering
+            user_message=user_message,
+            k_per_query=max(6, k_passive),
+            max_memories=min(48, max(16, k_passive * 3)),
         )
-        top_memories = memories[:k_passive]
 
         # Trace retrieval
         try:
@@ -138,8 +288,8 @@ async def build_system_prompt(
                 event_type="retrieval_query",
                 payload={
                     "query": user_message,
-                    "k_requested": k_passive * 3,
-                    "k_returned": len(memories),
+                    "k_passive": k_passive,
+                    "k_returned": len(top_memories),
                     "k_injected": len(top_memories),
                     "injected_memory_previews": [m.get("content", "")[:80] for m in top_memories],
                 },
@@ -191,7 +341,18 @@ async def build_system_prompt(
 
     # Tool notice
     blocks.append(
-        "Tu disposes du tool `search_memory` pour rechercher dans la mémoire de l'utilisateur quand les éléments ci-dessus ne suffisent pas, et du tool `get_user_profile_section` pour obtenir la version détaillée d'une section du profil."
+        "Tu disposes du tool `search_memory` pour rechercher dans la mémoire long-terme de l'utilisateur. "
+        "Règles obligatoires :\n"
+        "1. Si la question est large ou personnelle (\"qui je suis\", \"résume-moi\", \"parle-moi de moi\", \"mon profil\", \"exhaustif\", \"tout sur moi\"), tu DOIS être exhaustif : fais AU MOINS 6 appels parallèles à `search_memory` avec des requêtes explicites, chacune couvrant un domaine distinct :\n"
+        "   - travail / études / compétences\n"
+        "   - santé / corps / fitness / alimentation / sommeil\n"
+        "   - famille / proches / relations amoureuses / amis\n"
+        "   - loisirs / passions / créativité / sport / musique / jeux\n"
+        "   - projets personnels / ambitions / finances / crypto / assistant IA / atelier gouvernance\n"
+        "   - lieu de vie / logement / environnement / engagement associatif / valeurs / sobriété\n"
+        "2. Ne dis jamais \"je n'ai pas plus d'informations\", \"ta mémoire est vide\" ou \"je ne trouve rien\" sans avoir d'abord lancé des recherches ciblées par domaine.\n"
+        "3. Si tu manques d'informations sur un aspect précis, appelle `search_memory` avec des mots-clés en français directement liés à ce aspect (noms propres, lieux, activités).\n"
+        "4. Quand tu synthétises, structure ta réponse explicitement par domaine de vie. Ne te contente pas du travail : l'utilisateur attend un portrait global incluant santé, famille, relations, loisirs, projets, valeurs et lieu de vie."
     )
 
     return "\n\n".join(blocks)

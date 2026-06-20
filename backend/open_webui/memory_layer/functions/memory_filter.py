@@ -38,6 +38,9 @@ class Filter:
                 build_system_prompt,
                 inject_date_markers,
             )
+            from open_webui.memory_layer.tools.registration import (
+                SEARCH_MEMORY_TOOL_ID,
+            )
 
             user_id = __user__.get("id", "")
             if not user_id:
@@ -46,6 +49,14 @@ class Filter:
             messages = body.get("messages", [])
             if not messages:
                 return body
+
+            # Auto-activate the memory_layer search tool for this request
+            metadata = body.get("metadata", {}) or {}
+            existing_tool_ids = metadata.get("tool_ids", []) or []
+            if SEARCH_MEMORY_TOOL_ID not in existing_tool_ids:
+                metadata["tool_ids"] = existing_tool_ids + [SEARCH_MEMORY_TOOL_ID]
+                body["metadata"] = metadata
+                log.debug(f"memory_filter inlet: injected tool_id {SEARCH_MEMORY_TOOL_ID}")
 
             # Get last user message
             user_message = ""

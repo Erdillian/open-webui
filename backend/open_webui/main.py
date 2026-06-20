@@ -692,6 +692,15 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(scheduler_worker_loop(app))
 
+    # Register memory_layer tools so they are available to the LLM
+    try:
+        from open_webui.memory_layer.tools.registration import ensure_search_memory_tool
+
+        await ensure_search_memory_tool()
+        log.info('Memory layer tools registered.')
+    except Exception as e:
+        log.warning(f'Failed to register memory layer tools: {e}')
+
     # Start memory layer extraction worker
     try:
         from open_webui.memory_layer.workers.extraction_worker import extraction_worker_loop
