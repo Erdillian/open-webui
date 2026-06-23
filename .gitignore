@@ -10,12 +10,21 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# User Journey / memory import artifacts (contain personal data)
+*_import_profile.json
+test_e2e_playwright.db*
+backend/test_e2e_playwright.db*
+backend_user_journey.log
+seed_unified.log
+
+# Claude Code session plans / scratch
+.claude/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 .nvmrc
-CLAUDE.md
 # C extensions
 *.so
 
@@ -310,3 +319,8 @@ dist
 cypress/videos
 cypress/screenshots
 .vscode/settings.json
+
+# Memory layer fixtures containing personal data
+backend/tests_memory/fixtures/user_facts.json
+backend/tests_memory/fixtures/test_scenarios.json
+

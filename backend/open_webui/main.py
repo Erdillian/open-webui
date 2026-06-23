@@ -108,6 +108,12 @@ from open_webui.routers import (
     calendar,
 )
 
+from open_webui.memory_layer.routers import health, memory as memory_router, profile as profile_router, conflicts as conflicts_router, opening as opening_router, export as export_router, audit as audit_router
+from open_webui.memory_layer.functions.memory_filter import Filter as MemoryFilter
+
+# Auto-enable memory layer filter without requiring manual admin configuration
+_memory_filter = MemoryFilter()
+
 from open_webui.routers.retrieval import (
     get_embedding_function,
     get_reranking_function,
@@ -685,6 +691,39 @@ async def lifespan(app: FastAPI):
     from open_webui.utils.automations import scheduler_worker_loop
 
     asyncio.create_task(scheduler_worker_loop(app))
+
+    # Register memory_layer tools so they are available to the LLM
+    try:
+        from open_webui.memory_layer.tools.registration import ensure_search_memory_tool
+
+        await ensure_search_memory_tool()
+        log.info('Memory layer tools registered.')
+    except Exception as e:
+        log.warning(f'Failed to register memory layer tools: {e}')
+
+    # Start memory layer extraction worker
+    try:
+        from open_webui.memory_layer.workers.extraction_worker import extraction_worker_loop
+        asyncio.create_task(extraction_worker_loop())
+        log.info('Memory layer extraction worker started.')
+    except Exception as e:
+        log.warning(f'Failed to start memory extraction worker: {e}')
+
+    # Start memory layer profile worker
+    try:
+        from open_webui.memory_layer.workers.profile_worker import profile_worker_loop
+        asyncio.create_task(profile_worker_loop())
+        log.info('Memory layer profile worker started.')
+    except Exception as e:
+        log.warning(f'Failed to start memory profile worker: {e}')
+
+    # Start memory layer consolidation worker
+    try:
+        from open_webui.memory_layer.workers.consolidation_worker import consolidation_worker_loop
+        asyncio.create_task(consolidation_worker_loop())
+        log.info('Memory layer consolidation worker started.')
+    except Exception as e:
+        log.warning(f'Failed to start memory consolidation worker: {e}')
 
     if app.state.config.ENABLE_BASE_MODELS_CACHE:
         try:
@@ -1457,6 +1496,14 @@ app.include_router(terminals.router, prefix='/api/v1/terminals', tags=['terminal
 app.include_router(automations.router, prefix='/api/v1/automations', tags=['automations'])
 app.include_router(calendar.router, prefix='/api/v1/calendars', tags=['calendars'])
 
+app.include_router(health.router, prefix='/api/mem', tags=['memory_layer'])
+app.include_router(memory_router.router, prefix='/api/mem/memory', tags=['memory_layer'])
+app.include_router(profile_router.router, prefix='/api/mem/profile', tags=['memory_layer'])
+app.include_router(conflicts_router.router, prefix='/api/mem/conflicts', tags=['memory_layer'])
+app.include_router(opening_router.router, prefix='/api/mem/opening_prompt', tags=['memory_layer'])
+app.include_router(export_router.router, prefix='/api/mem', tags=['memory_layer'])
+app.include_router(audit_router.router, prefix='/api/mem/audit', tags=['memory_layer'])
+
 # SCIM 2.0 API for identity management
 if ENABLE_SCIM:
     app.include_router(scim.router, prefix='/api/v1/scim/v2', tags=['scim'])
@@ -1975,6 +2022,14 @@ async def chat_completion(
         try:
             form_data, metadata, events = await process_chat_payload(request, form_data, user, metadata, model)
 
+            # Memory layer inlet hook — inject profile + memories context
+            try:
+                if _memory_filter.valves.enabled:
+                    user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                    form_data = await _memory_filter.inlet(form_data, user_dict)
+            except Exception as e:
+                log.error(f'memory_filter inlet hook error: {e}')
+
             response = await chat_completion_handler(request, form_data, user)
 
             # When the upstream provider returns an error (e.g. HTTP 400
@@ -1994,7 +2049,24 @@ async def chat_completion(
 
             ctx = await build_chat_response_context(request, form_data, user, model, metadata, tasks, events)
 
-            return await process_chat_response(response, ctx)
+            result = await process_chat_response(response, ctx)
+
+            # Memory layer outlet hook — enqueue exchange for extraction
+            async def _run_outlet():
+                try:
+                    if _memory_filter.valves.enabled:
+                        user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                        await _memory_filter.outlet(form_data, user_dict)
+                except Exception as e:
+                    log.error(f'memory_filter outlet hook error: {e}')
+
+            try:
+                asyncio.create_task(_run_outlet())
+                log.debug('memory_filter outlet task created')
+            except Exception as e:
+                log.error(f'memory_filter outlet task creation error: {e}')
+
+            return result
         except asyncio.CancelledError:
             log.info('Chat processing was cancelled')
             try:
@@ -2236,7 +2308,17 @@ async def chat_completed(request: Request, form_data: dict, user=Depends(get_ver
             request.state.direct = True
             request.state.model = model_item
 
-        return await chat_completed_handler(request, form_data, user)
+        result = await chat_completed_handler(request, form_data, user)
+
+        # Memory layer outlet hook — enqueue exchange for extraction
+        try:
+            if _memory_filter.valves.enabled:
+                user_dict = user.model_dump() if hasattr(user, 'model_dump') else {'id': getattr(user, 'id', '')}
+                await _memory_filter.outlet(form_data, user_dict)
+        except Exception as e:
+            log.error(f'memory_filter outlet hook error: {e}')
+
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

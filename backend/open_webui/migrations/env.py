@@ -4,8 +4,16 @@ from logging.config import fileConfig
 from alembic import context
 from open_webui.models.auths import Auth
 from open_webui.models.calendar import Calendar, CalendarEvent, CalendarEventAttendee  # noqa: F401
+from open_webui.memory_layer.models.memory import MemoryItem  # noqa: F401
+from open_webui.memory_layer.models.conflict import MemoryConflict  # noqa: F401
+from open_webui.memory_layer.models.profile import UserProfile, UserProfileHistory  # noqa: F401
+from open_webui.memory_layer.models.tag import MemoryTag, MemoryItemTag  # noqa: F401
 from open_webui.env import DATABASE_URL, DATABASE_PASSWORD, LOG_FORMAT
-from open_webui.internal.db import extract_ssl_params_from_url, reattach_ssl_params_to_url
+from open_webui.internal.db import (
+    escape_sqlcipher_pragma_key,
+    extract_ssl_params_from_url,
+    reattach_ssl_params_to_url,
+)
 from sqlalchemy import engine_from_config, pool, create_engine
 
 # this is the Alembic Config object, which provides
@@ -90,8 +98,9 @@ def run_migrations_online() -> None:
         def create_sqlcipher_connection():
             import sqlcipher3
 
+            safe_key = escape_sqlcipher_pragma_key(DATABASE_PASSWORD)
             conn = sqlcipher3.connect(db_path, check_same_thread=False)
-            conn.execute(f"PRAGMA key = '{DATABASE_PASSWORD}'")
+            conn.execute(f"PRAGMA key = '{safe_key}'")
             return conn
 
         connectable = create_engine(
