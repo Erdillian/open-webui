@@ -15,11 +15,13 @@ vite.config.ts.timestamp-*
 *_import_profile.json
 test_e2e_playwright.db*
 backend/test_e2e_playwright.db*
+open-webui.db*
 backend_user_journey.log
 seed_unified.log
 
 # Claude Code session plans / scratch
 .claude/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
