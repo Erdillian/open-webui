@@ -19,6 +19,9 @@ open-webui.db*
 backend_user_journey.log
 seed_unified.log
 
+# ChromaDB vector store (local embeddings, regenerated per environment)
+data/vector_db/
+
 # Claude Code session plans / scratch
 .claude/
 
